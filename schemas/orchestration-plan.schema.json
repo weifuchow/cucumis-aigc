@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Orchestration Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workflow",
+    "planned_stages",
+    "optional_stages",
+    "disabled_stages"
+  ],
+  "properties": {
+    "workflow": {
+      "type": "string",
+      "minLength": 1
+    },
+    "planned_stages": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "optional_stages": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "disabled_stages": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "metadata": {
+      "type": "object"
+    }
+  }
+}

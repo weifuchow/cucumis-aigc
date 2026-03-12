@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Orchestration State",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "current_stage",
+    "completed_stages",
+    "skipped_stages",
+    "last_failed_stage",
+    "next_stage"
+  ],
+  "properties": {
+    "current_stage": {
+      "type": ["string", "null"]
+    },
+    "completed_stages": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "skipped_stages": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "last_failed_stage": {
+      "type": ["string", "null"]
+    },
+    "next_stage": {
+      "type": ["string", "null"]
+    }
+  }
+}
