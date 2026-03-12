@@ -4,6 +4,8 @@
 
 `video_pipeline` 采用阶段推进式状态机。每个阶段只有在前置产物满足要求时才允许进入执行状态。
 
+状态推进的判断者默认是 `master_orchestrator`，并应将其快照写入 `projects/<project>/orchestration/state.json`。
+
 ## States
 
 ### `created`
@@ -74,6 +76,7 @@ created/input_parsed/script_generated/storyboard_planned/timeline_built/render_p
 - 如果输入产物有效，可从对应状态继续推进
 - 如果输入产物损坏，必须先修复或重建，再恢复下游阶段
 - 如果操作者手工修改了中间文件，后续阶段应基于修改后的文件继续
+- 每次恢复判断都应追加主控决策到 `projects/<project>/orchestration/decisions.jsonl`
 
 ## Event Expectations
 

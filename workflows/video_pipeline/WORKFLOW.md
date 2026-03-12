@@ -4,6 +4,8 @@
 
 `video_pipeline` 是 `cucumis-aigc` 的主工作流定义，描述从自然语言需求到本地视频产出的最小闭环。它不负责实现具体能力，而负责定义阶段顺序、每阶段目标、产物位置和人工介入点。
 
+该 workflow 默认由 `skills/master_orchestrator/SKILL.md` 解释和推进。
+
 ## Workflow Goal
 
 第一版最小闭环是：
@@ -50,6 +52,7 @@
 
 ## Required Runtime Behavior
 
+- 主控应将当前状态、执行计划和关键决策写入 `projects/<project>/orchestration/`
 - 每一阶段开始与结束都必须写事件日志
 - 每一阶段只读自己声明的输入，不隐式依赖其他临时文件
 - 每一阶段失败时必须写错误事件，并保留已生成产物

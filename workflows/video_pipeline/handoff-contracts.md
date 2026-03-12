@@ -9,6 +9,7 @@
 - 所有输入输出路径都相对于 `projects/<project-name>/`
 - 所有结构化文件优先使用 JSON
 - 所有阶段都必须写事件到 `events/events.jsonl`
+- 主控自己的状态、计划和决策统一写到 `orchestration/`
 - 阶段产物一旦写出，就应能被后续阶段独立消费
 
 ## Stage Contracts
