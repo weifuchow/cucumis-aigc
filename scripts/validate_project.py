@@ -12,6 +12,9 @@ REQUIRED_FILES = [
     pathlib.Path("README.md"),
     pathlib.Path("request.md"),
     pathlib.Path("events/events.jsonl"),
+    pathlib.Path("orchestration/state.json"),
+    pathlib.Path("orchestration/plan.json"),
+    pathlib.Path("orchestration/decisions.jsonl"),
     pathlib.Path("input/input.json"),
 ]
 
