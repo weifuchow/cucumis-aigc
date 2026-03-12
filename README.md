@@ -230,6 +230,7 @@ cucumis-aigc/
   workflows/
     video_pipeline/
   skills/
+    master_orchestrator/
     input_parser/
     script_writer/
     storyboard_planner/
