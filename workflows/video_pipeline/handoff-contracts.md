@@ -1,0 +1,99 @@
+# Video Pipeline Handoff Contracts
+
+## Purpose
+
+该文档定义主工作流中每个阶段的输入、输出和事件契约，避免 skill 之间通过隐式约定耦合。
+
+## Global Rules
+
+- 所有输入输出路径都相对于 `projects/<project-name>/`
+- 所有结构化文件优先使用 JSON
+- 所有阶段都必须写事件到 `events/events.jsonl`
+- 阶段产物一旦写出，就应能被后续阶段独立消费
+
+## Stage Contracts
+
+### `input_parser`
+
+**Reads**
+- `request.md` 或其他原始用户输入
+
+**Writes**
+- `input/input.json`
+
+**Emits**
+- `workflow.stage.started`
+- `artifact.written`
+- `workflow.stage.completed`
+
+### `script_writer`
+
+**Reads**
+- `input/input.json`
+
+**Writes**
+- `script/script.json`
+
+**Emits**
+- `workflow.stage.started`
+- `artifact.written`
+- `workflow.stage.completed`
+
+### `storyboard_planner`
+
+**Reads**
+- `script/script.json`
+
+**Writes**
+- `storyboard/storyboard.json`
+
+**Emits**
+- `workflow.stage.started`
+- `artifact.written`
+- `workflow.stage.completed`
+
+### `timeline_builder`
+
+**Reads**
+- `storyboard/storyboard.json`
+- `assets/manifest.json` if present
+
+**Writes**
+- `timeline/timeline.json`
+
+**Emits**
+- `workflow.stage.started`
+- `artifact.written`
+- `workflow.stage.completed`
+
+### `ffmpeg_renderer`
+
+**Reads**
+- `timeline/timeline.json`
+
+**Writes**
+- `outputs/render-plan.json`
+- `outputs/final.mp4` in later stages
+
+**Emits**
+- `workflow.stage.started`
+- `artifact.written`
+- `workflow.stage.completed`
+
+## Contract Violations
+
+以下情况视为违反交接契约：
+
+- 读取未声明文件
+- 写入未约定目录
+- 覆盖已有产物但不写事件
+- 输出 JSON 结构不符合约定 schema
+
+## Validation Strategy
+
+共享脚本 `scripts/validate_project.py` 应至少检查：
+
+- 必需目录是否存在
+- 必需文件是否存在
+- JSON 文件是否可解析
+- 关键事件日志是否存在
