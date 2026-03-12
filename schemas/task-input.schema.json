@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Task Input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "topic",
+    "goal",
+    "duration_seconds",
+    "language",
+    "aspect_ratio",
+    "style",
+    "requires_voiceover",
+    "requires_subtitles"
+  ],
+  "properties": {
+    "topic": {
+      "type": "string",
+      "minLength": 1
+    },
+    "goal": {
+      "type": "string",
+      "minLength": 1
+    },
+    "duration_seconds": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "language": {
+      "type": "string",
+      "minLength": 1
+    },
+    "aspect_ratio": {
+      "type": "string",
+      "enum": ["16:9", "9:16", "1:1", "4:3"]
+    },
+    "style": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requires_voiceover": {
+      "type": "boolean"
+    },
+    "requires_subtitles": {
+      "type": "boolean"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Script",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "summary", "audio_track", "visual_track", "beats"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "audio_track": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "visual_track": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "beats": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["beat_id", "purpose"],
+        "properties": {
+          "beat_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

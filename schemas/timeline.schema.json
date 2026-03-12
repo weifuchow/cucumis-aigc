@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Timeline",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["metadata", "tracks", "segments", "output"],
+  "properties": {
+    "metadata": {
+      "type": "object"
+    },
+    "tracks": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "segments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["segment_id", "scene_id", "start", "end"],
+        "properties": {
+          "segment_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scene_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "start": {
+            "type": "number",
+            "minimum": 0
+          },
+          "end": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "aspect_ratio"],
+      "properties": {
+        "format": {
+          "type": "string",
+          "minLength": 1
+        },
+        "aspect_ratio": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
