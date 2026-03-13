@@ -1,0 +1,6 @@
+{
+  "provider": "poe",
+  "mode": "mock",
+  "model": "elevenlabs-v3",
+  "request_id": ""
+}

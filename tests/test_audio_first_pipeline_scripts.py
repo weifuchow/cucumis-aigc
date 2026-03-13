@@ -63,6 +63,14 @@ class AudioFirstPipelineScriptsTest(unittest.TestCase):
         self.assertEqual(payload["music_emotion"], "前半段压抑，后半段燃向")
         self.assertEqual(payload["pacing_preference"], "前慢后快")
 
+    def test_run_input_parser_writes_project_level_models(self) -> None:
+        result = run_script("run_input_parser.py", self.project_dir)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        payload = json.loads((self.project_dir / "input" / "input.json").read_text(encoding="utf-8"))
+        self.assertEqual(payload["audio_model"], "elevenlabs-v3")
+        self.assertEqual(payload["video_model"], "veo-3.1-fast")
+
     def test_run_script_writer_adds_emotion_markers_and_turning_points(self) -> None:
         self.assertEqual(run_script("run_input_parser.py", self.project_dir).returncode, 0)
         result = run_script("run_script_writer.py", self.project_dir)
@@ -84,6 +92,22 @@ class AudioFirstPipelineScriptsTest(unittest.TestCase):
         self.assertTrue(voiceover["segments"])
         self.assertTrue(bgm["track_id"])
         self.assertTrue(beat_grid["beats"])
+
+    def test_run_audio_foundation_records_poe_metadata(self) -> None:
+        self.assertEqual(run_script("run_input_parser.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_script_writer.py", self.project_dir).returncode, 0)
+        result = run_script("run_audio_foundation.py", self.project_dir)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        tts_response = json.loads((self.project_dir / "audio" / "tts-response.json").read_text(encoding="utf-8"))
+        usage = json.loads((self.project_dir / "audio" / "usage.json").read_text(encoding="utf-8"))
+        cost_lines = (self.project_dir / "costs" / "poe-usage.jsonl").read_text(encoding="utf-8").splitlines()
+
+        self.assertEqual(tts_response["model"], "elevenlabs-v3")
+        self.assertEqual(usage["model"], "elevenlabs-v3")
+        self.assertIn(usage["mode"], {"mock", "live"})
+        self.assertTrue(cost_lines)
+        self.assertEqual(json.loads(cost_lines[0])["skill"], "audio_foundation")
 
     def test_run_global_timeline_initializer_writes_global_timeline(self) -> None:
         self.assertEqual(run_script("run_input_parser.py", self.project_dir).returncode, 0)
@@ -115,6 +139,25 @@ class AudioFirstPipelineScriptsTest(unittest.TestCase):
         self.assertIn("beat_alignment", first_scene)
         self.assertIn("transition_intent", first_scene)
         self.assertIn("motion_intent", first_scene)
+
+    def test_run_constrained_video_generator_writes_video_artifacts(self) -> None:
+        self.assertEqual(run_script("run_input_parser.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_script_writer.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_audio_foundation.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_global_timeline_initializer.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_beat_sync_storyboard_planner.py", self.project_dir).returncode, 0)
+        result = run_script("run_constrained_video_generator.py", self.project_dir)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        clips = json.loads((self.project_dir / "video" / "clips.json").read_text(encoding="utf-8"))
+        requests = json.loads((self.project_dir / "video" / "requests.json").read_text(encoding="utf-8"))
+        usage = json.loads((self.project_dir / "video" / "usage.json").read_text(encoding="utf-8"))
+        cost_lines = (self.project_dir / "costs" / "poe-usage.jsonl").read_text(encoding="utf-8").splitlines()
+
+        self.assertTrue(clips["clips"])
+        self.assertEqual(requests["model"], "veo-3.1-fast")
+        self.assertEqual(usage["model"], "veo-3.1-fast")
+        self.assertIn(json.loads(cost_lines[-1])["skill"], {"audio_foundation", "constrained_video_generator"})
 
 
 if __name__ == "__main__":

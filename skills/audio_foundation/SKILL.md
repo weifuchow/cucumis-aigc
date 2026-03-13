@@ -25,5 +25,6 @@
 ## Runtime Expectations
 
 - 音频基建必须先于分镜生成
-- 第一版允许输出 mock 数据，但结构必须稳定
+- 默认通过 Poe API 生成或模拟生成配音相关数据
+- 项目级默认模型来自 `input/input.json` 的 `audio_model`
 - 所有时间戳都应为后续全局时间网格的刚性输入

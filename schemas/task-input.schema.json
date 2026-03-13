@@ -12,6 +12,8 @@
     "style",
     "music_emotion",
     "pacing_preference",
+    "audio_model",
+    "video_model",
     "requires_voiceover",
     "requires_subtitles"
   ],
@@ -45,6 +47,14 @@
       "minLength": 1
     },
     "pacing_preference": {
+      "type": "string",
+      "minLength": 1
+    },
+    "audio_model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "video_model": {
       "type": "string",
       "minLength": 1
     },

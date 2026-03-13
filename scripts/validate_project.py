@@ -19,17 +19,25 @@ REQUIRED_FILES = [
     pathlib.Path("audio/voiceover.json"),
     pathlib.Path("audio/bgm-selection.json"),
     pathlib.Path("audio/beat-grid.json"),
+    pathlib.Path("audio/tts-response.json"),
+    pathlib.Path("audio/usage.json"),
+    pathlib.Path("video/clips.json"),
+    pathlib.Path("video/requests.json"),
+    pathlib.Path("video/usage.json"),
     pathlib.Path("timeline/global-timeline.json"),
     pathlib.Path("review/review-report.json"),
     pathlib.Path("review/observer-summary.md"),
+    pathlib.Path("costs/poe-usage.jsonl"),
 ]
 
 REQUIRED_DIRS = [
     pathlib.Path("script"),
     pathlib.Path("storyboard"),
+    pathlib.Path("video"),
     pathlib.Path("timeline"),
     pathlib.Path("audio"),
     pathlib.Path("review"),
+    pathlib.Path("costs"),
     pathlib.Path("assets"),
     pathlib.Path("outputs"),
 ]
@@ -59,6 +67,11 @@ def main() -> int:
 
     json_paths = [
         project_dir / "input" / "input.json",
+        project_dir / "audio" / "tts-response.json",
+        project_dir / "audio" / "usage.json",
+        project_dir / "video" / "clips.json",
+        project_dir / "video" / "requests.json",
+        project_dir / "video" / "usage.json",
         project_dir / "review" / "review-report.json",
     ]
     for input_path in json_paths:

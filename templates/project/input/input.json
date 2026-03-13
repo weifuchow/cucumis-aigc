@@ -7,6 +7,8 @@
   "style": "",
   "music_emotion": "",
   "pacing_preference": "",
+  "audio_model": "elevenlabs-v3",
+  "video_model": "veo-3.1-fast",
   "requires_voiceover": true,
   "requires_subtitles": true
 }

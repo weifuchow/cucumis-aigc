@@ -1,0 +1,7 @@
+{
+  "provider": "poe",
+  "mode": "mock",
+  "model": "veo-3.1-fast",
+  "request_id": "",
+  "cost_points": 0
+}

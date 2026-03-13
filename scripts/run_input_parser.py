@@ -32,6 +32,8 @@ def parse_request(text: str) -> dict[str, object]:
         "style": "",
         "music_emotion": "",
         "pacing_preference": "",
+        "audio_model": "elevenlabs-v3",
+        "video_model": "veo-3.1-fast",
         "requires_voiceover": True,
         "requires_subtitles": True,
     }
