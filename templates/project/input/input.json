@@ -1,1 +1,12 @@
-{}
+{
+  "topic": "",
+  "goal": "",
+  "duration_seconds": 0,
+  "language": "",
+  "aspect_ratio": "9:16",
+  "style": "",
+  "music_emotion": "",
+  "pacing_preference": "",
+  "requires_voiceover": true,
+  "requires_subtitles": true
+}

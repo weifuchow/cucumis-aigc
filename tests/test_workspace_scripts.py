@@ -38,6 +38,10 @@ class WorkspaceScriptsTest(unittest.TestCase):
             self.assertTrue((project_dir / "orchestration" / "plan.json").exists())
             self.assertTrue((project_dir / "orchestration" / "decisions.jsonl").exists())
             self.assertTrue((project_dir / "input" / "input.json").exists())
+            self.assertTrue((project_dir / "audio" / "voiceover.json").exists())
+            self.assertTrue((project_dir / "audio" / "bgm-selection.json").exists())
+            self.assertTrue((project_dir / "audio" / "beat-grid.json").exists())
+            self.assertTrue((project_dir / "timeline" / "global-timeline.json").exists())
             self.assertTrue((project_dir / "script").is_dir())
             self.assertTrue((project_dir / "storyboard").is_dir())
             self.assertTrue((project_dir / "timeline").is_dir())
@@ -103,9 +107,14 @@ class WorkspaceScriptsTest(unittest.TestCase):
             (project_dir / "orchestration" / "decisions.jsonl").write_text("", encoding="utf-8")
             (project_dir / "input").mkdir()
             (project_dir / "input" / "input.json").write_text("{}", encoding="utf-8")
+            (project_dir / "audio").mkdir()
+            (project_dir / "audio" / "voiceover.json").write_text("{}", encoding="utf-8")
+            (project_dir / "audio" / "bgm-selection.json").write_text("{}", encoding="utf-8")
+            (project_dir / "audio" / "beat-grid.json").write_text("{}", encoding="utf-8")
             (project_dir / "script").mkdir()
             (project_dir / "storyboard").mkdir()
             (project_dir / "timeline").mkdir()
+            (project_dir / "timeline" / "global-timeline.json").write_text("{}", encoding="utf-8")
             (project_dir / "assets").mkdir()
             (project_dir / "outputs").mkdir()
 
@@ -133,6 +142,7 @@ class WorkspaceScriptsTest(unittest.TestCase):
             (project_dir / "events" / "events.jsonl").write_text("", encoding="utf-8")
             (project_dir / "input").mkdir()
             (project_dir / "input" / "input.json").write_text("{}", encoding="utf-8")
+            (project_dir / "audio").mkdir()
             (project_dir / "script").mkdir()
             (project_dir / "storyboard").mkdir()
             (project_dir / "timeline").mkdir()
@@ -152,6 +162,48 @@ class WorkspaceScriptsTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("orchestration/state.json", result.stderr)
+
+    def test_validate_project_rejects_missing_audio_foundation_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = pathlib.Path(tmp) / "demo-project"
+            project_dir.mkdir()
+
+            (project_dir / "README.md").write_text("demo", encoding="utf-8")
+            (project_dir / "request.md").write_text("request", encoding="utf-8")
+            (project_dir / "events").mkdir()
+            (project_dir / "events" / "events.jsonl").write_text("", encoding="utf-8")
+            (project_dir / "orchestration").mkdir()
+            (project_dir / "orchestration" / "state.json").write_text(
+                '{"current_stage": null, "completed_stages": [], "skipped_stages": [], "last_failed_stage": null, "next_stage": null}',
+                encoding="utf-8",
+            )
+            (project_dir / "orchestration" / "plan.json").write_text(
+                '{"workflow": "video_pipeline", "planned_stages": [], "optional_stages": [], "disabled_stages": [], "metadata": {}}',
+                encoding="utf-8",
+            )
+            (project_dir / "orchestration" / "decisions.jsonl").write_text("", encoding="utf-8")
+            (project_dir / "input").mkdir()
+            (project_dir / "input" / "input.json").write_text("{}", encoding="utf-8")
+            (project_dir / "script").mkdir()
+            (project_dir / "audio").mkdir()
+            (project_dir / "storyboard").mkdir()
+            (project_dir / "timeline").mkdir()
+            (project_dir / "assets").mkdir()
+            (project_dir / "outputs").mkdir()
+
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(REPO_ROOT / "scripts" / "validate_project.py"),
+                    "--project",
+                    str(project_dir),
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("audio/voiceover.json", result.stderr)
 
 
 if __name__ == "__main__":

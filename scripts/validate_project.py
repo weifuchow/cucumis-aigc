@@ -16,12 +16,17 @@ REQUIRED_FILES = [
     pathlib.Path("orchestration/plan.json"),
     pathlib.Path("orchestration/decisions.jsonl"),
     pathlib.Path("input/input.json"),
+    pathlib.Path("audio/voiceover.json"),
+    pathlib.Path("audio/bgm-selection.json"),
+    pathlib.Path("audio/beat-grid.json"),
+    pathlib.Path("timeline/global-timeline.json"),
 ]
 
 REQUIRED_DIRS = [
     pathlib.Path("script"),
     pathlib.Path("storyboard"),
     pathlib.Path("timeline"),
+    pathlib.Path("audio"),
     pathlib.Path("assets"),
     pathlib.Path("outputs"),
 ]
