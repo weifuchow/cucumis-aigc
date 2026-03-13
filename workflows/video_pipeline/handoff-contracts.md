@@ -40,7 +40,6 @@
 - `artifact.written`
 - `workflow.stage.completed`
 
-### `storyboard_planner`
 ### `audio_foundation`
 
 **Reads**
