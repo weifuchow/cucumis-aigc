@@ -10,6 +10,8 @@
     "language",
     "aspect_ratio",
     "style",
+    "music_emotion",
+    "pacing_preference",
     "requires_voiceover",
     "requires_subtitles"
   ],
@@ -35,6 +37,14 @@
       "enum": ["16:9", "9:16", "1:1", "4:3"]
     },
     "style": {
+      "type": "string",
+      "minLength": 1
+    },
+    "music_emotion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pacing_preference": {
       "type": "string",
       "minLength": 1
     },

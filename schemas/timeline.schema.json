@@ -6,7 +6,13 @@
   "required": ["metadata", "tracks", "segments", "output"],
   "properties": {
     "metadata": {
-      "type": "object"
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "global_timeline_source": {
+          "type": "string"
+        }
+      }
     },
     "tracks": {
       "type": "array",

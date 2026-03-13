@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Audio Foundation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["voiceover", "bgm_selection", "beat_grid"],
+  "properties": {
+    "voiceover": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["segment_id", "text", "start", "end"],
+        "properties": {
+          "segment_id": {"type": "string", "minLength": 1},
+          "text": {"type": "string", "minLength": 1},
+          "start": {"type": "number", "minimum": 0},
+          "end": {"type": "number", "exclusiveMinimum": 0}
+        }
+      }
+    },
+    "bgm_selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["track_id", "mood"],
+      "properties": {
+        "track_id": {"type": "string", "minLength": 1},
+        "mood": {"type": "string", "minLength": 1}
+      }
+    },
+    "beat_grid": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["time", "kind"],
+        "properties": {
+          "time": {"type": "number", "minimum": 0},
+          "kind": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

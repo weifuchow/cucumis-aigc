@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Global Timeline",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "narration_windows",
+    "beat_anchors",
+    "transition_windows",
+    "reserved_silence_gaps",
+    "scene_timing_slots"
+  ],
+  "properties": {
+    "narration_windows": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "beat_anchors": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "transition_windows": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "reserved_silence_gaps": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "scene_timing_slots": {
+      "type": "array",
+      "items": {"type": "object"}
+    }
+  }
+}

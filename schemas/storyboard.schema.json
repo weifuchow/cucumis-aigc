@@ -15,9 +15,14 @@
           "scene_id",
           "purpose",
           "visual_description",
-          "estimated_duration_seconds",
+          "start_time",
+          "end_time",
+          "duration_seconds",
           "asset_mode",
-          "subtitle_text"
+          "subtitle_text",
+          "beat_alignment",
+          "transition_intent",
+          "motion_intent"
         ],
         "properties": {
           "scene_id": {
@@ -32,7 +37,15 @@
             "type": "string",
             "minLength": 1
           },
-          "estimated_duration_seconds": {
+          "start_time": {
+            "type": "number",
+            "minimum": 0
+          },
+          "end_time": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "duration_seconds": {
             "type": "number",
             "exclusiveMinimum": 0
           },
@@ -42,6 +55,18 @@
           },
           "subtitle_text": {
             "type": "string"
+          },
+          "beat_alignment": {
+            "type": "string",
+            "minLength": 1
+          },
+          "transition_intent": {
+            "type": "string",
+            "minLength": 1
+          },
+          "motion_intent": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }

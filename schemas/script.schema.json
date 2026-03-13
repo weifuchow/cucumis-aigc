@@ -3,7 +3,15 @@
   "title": "Script",
   "type": "object",
   "additionalProperties": false,
-  "required": ["title", "summary", "audio_track", "visual_track", "beats"],
+  "required": [
+    "title",
+    "summary",
+    "audio_track",
+    "visual_track",
+    "beats",
+    "emotion_markers",
+    "turning_points"
+  ],
   "properties": {
     "title": {
       "type": "string",
@@ -39,6 +47,50 @@
           "purpose": {
             "type": "string",
             "minLength": 1
+          }
+        }
+      }
+    },
+    "emotion_markers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["marker_id", "label", "line_index"],
+        "properties": {
+          "marker_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "line_index": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "turning_points": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["point_id", "label", "line_index"],
+        "properties": {
+          "point_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "line_index": {
+            "type": "integer",
+            "minimum": 0
           }
         }
       }
