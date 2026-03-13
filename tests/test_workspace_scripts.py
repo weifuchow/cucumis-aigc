@@ -42,6 +42,8 @@ class WorkspaceScriptsTest(unittest.TestCase):
             self.assertTrue((project_dir / "audio" / "bgm-selection.json").exists())
             self.assertTrue((project_dir / "audio" / "beat-grid.json").exists())
             self.assertTrue((project_dir / "timeline" / "global-timeline.json").exists())
+            self.assertTrue((project_dir / "review" / "review-report.json").exists())
+            self.assertTrue((project_dir / "review" / "observer-summary.md").exists())
             self.assertTrue((project_dir / "script").is_dir())
             self.assertTrue((project_dir / "storyboard").is_dir())
             self.assertTrue((project_dir / "timeline").is_dir())
@@ -115,6 +117,9 @@ class WorkspaceScriptsTest(unittest.TestCase):
             (project_dir / "storyboard").mkdir()
             (project_dir / "timeline").mkdir()
             (project_dir / "timeline" / "global-timeline.json").write_text("{}", encoding="utf-8")
+            (project_dir / "review").mkdir()
+            (project_dir / "review" / "review-report.json").write_text("{}", encoding="utf-8")
+            (project_dir / "review" / "observer-summary.md").write_text("# Demo\n", encoding="utf-8")
             (project_dir / "assets").mkdir()
             (project_dir / "outputs").mkdir()
 
@@ -146,6 +151,7 @@ class WorkspaceScriptsTest(unittest.TestCase):
             (project_dir / "script").mkdir()
             (project_dir / "storyboard").mkdir()
             (project_dir / "timeline").mkdir()
+            (project_dir / "review").mkdir()
             (project_dir / "assets").mkdir()
             (project_dir / "outputs").mkdir()
 
@@ -188,6 +194,7 @@ class WorkspaceScriptsTest(unittest.TestCase):
             (project_dir / "audio").mkdir()
             (project_dir / "storyboard").mkdir()
             (project_dir / "timeline").mkdir()
+            (project_dir / "review").mkdir()
             (project_dir / "assets").mkdir()
             (project_dir / "outputs").mkdir()
 

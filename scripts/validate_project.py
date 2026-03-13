@@ -20,6 +20,8 @@ REQUIRED_FILES = [
     pathlib.Path("audio/bgm-selection.json"),
     pathlib.Path("audio/beat-grid.json"),
     pathlib.Path("timeline/global-timeline.json"),
+    pathlib.Path("review/review-report.json"),
+    pathlib.Path("review/observer-summary.md"),
 ]
 
 REQUIRED_DIRS = [
@@ -27,6 +29,7 @@ REQUIRED_DIRS = [
     pathlib.Path("storyboard"),
     pathlib.Path("timeline"),
     pathlib.Path("audio"),
+    pathlib.Path("review"),
     pathlib.Path("assets"),
     pathlib.Path("outputs"),
 ]
@@ -54,8 +57,13 @@ def main() -> int:
         if not (project_dir / path).is_dir():
             missing.append(str(path))
 
-    input_path = project_dir / "input" / "input.json"
-    if input_path.is_file():
+    json_paths = [
+        project_dir / "input" / "input.json",
+        project_dir / "review" / "review-report.json",
+    ]
+    for input_path in json_paths:
+        if not input_path.is_file():
+            continue
         try:
             json.loads(input_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:

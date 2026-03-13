@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Review Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "project",
+    "status",
+    "checked_at",
+    "completed_stages",
+    "missing_artifacts",
+    "warnings",
+    "next_recommended_action"
+  ],
+  "properties": {
+    "project": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ready", "in_progress", "blocked"]
+    },
+    "checked_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "completed_stages": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "missing_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "next_recommended_action": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

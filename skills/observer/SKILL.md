@@ -2,17 +2,33 @@
 
 ## Purpose
 
-以只读方式展示项目状态、事件流和关键产物，便于操作者理解当前进度与异常位置。
+汇总项目状态、关键产物、最近决策和最近审查结果，生成一份人类可直接阅读的项目摘要。
 
-## Status
+## Reads
 
-占位中。后续可接入本地页面或轻量 CLI 观察模式。
+- `projects/<project>/orchestration/state.json`
+- `projects/<project>/orchestration/plan.json`
+- `projects/<project>/orchestration/decisions.jsonl`
+- `projects/<project>/review/review-report.json`
+- `projects/<project>/` 下关键产物
 
-## Planned Reads
+## Writes
 
-- `projects/<project>/events/events.jsonl`
-- `projects/<project>/`
+- `projects/<project>/review/observer-summary.md`
 
-## Planned Writes
+## Summary Structure
 
-- 无。观察层原则上只读。
+第一版摘要固定包含：
+
+1. 项目概览
+2. 阶段进度
+3. 关键产物
+4. 最近决策
+5. 审查结果
+6. 下一步建议
+
+## Non-Goals
+
+- 不做实时 UI
+- 不做复杂图表
+- 不修改任何项目事实文件
