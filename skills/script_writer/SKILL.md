@@ -2,7 +2,7 @@
 
 ## Purpose
 
-基于结构化输入配置生成脚本，形成下游分镜阶段的核心叙事基础。
+基于结构化输入配置生成脚本，并完成情绪标注，形成后续音频基建阶段的核心叙事基础。
 
 ## Reads
 
@@ -21,8 +21,10 @@
 - `audio_track`
 - `visual_track`
 - `beats`
+- `emotion_markers`
+- `turning_points`
 
-其中 `beats` 应表达段落级节奏或叙事单元，为分镜规划提供稳定输入。
+其中 `beats` 应表达段落级节奏或叙事单元，`emotion_markers` 和 `turning_points` 则为 BGM 匹配和节拍网格提供稳定输入。
 
 ## Runtime Expectations
 

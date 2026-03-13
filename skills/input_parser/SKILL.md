@@ -2,7 +2,7 @@
 
 ## Purpose
 
-将原始任务请求转换成标准化输入配置，作为整条视频生产链的统一起点。
+将原始任务请求转换成标准化输入配置，作为整条听觉驱动视频生产链的统一起点。
 
 ## Reads
 
@@ -23,6 +23,8 @@
 - `language`
 - `aspect_ratio`
 - `style`
+- `music_emotion`
+- `pacing_preference`
 - `requires_voiceover`
 - `requires_subtitles`
 

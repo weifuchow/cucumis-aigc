@@ -35,9 +35,16 @@
 
 1. `input_parser`
 2. `script_writer`
-3. `storyboard_planner`
-4. `timeline_builder`
-5. `ffmpeg_renderer`
+3. `audio_foundation`
+4. `global_timeline_initializer`
+5. `beat_sync_storyboard_planner`
+6. `keyframe_planner`
+7. `prompt_engineer`
+8. `image_generator`
+9. `constrained_video_generator`
+10. `subtitle_asset_manager`
+11. `timeline_builder`
+12. `ffmpeg_renderer_reviewer`
 
 ## Required Outputs
 
@@ -74,6 +81,7 @@
 - 主控写出的状态与计划必须可被脚本和人工同时读取
 - 所有主控决策都应尽量落盘，而不是只存在于瞬时推理里
 - 主控不应直接生成下游业务内容
+- 主控在分镜及其后续阶段前，必须优先检查音频时间锚点是否已建立
 
 ## Failure Behavior
 

@@ -22,12 +22,23 @@
 ### `script_generated`
 
 - `script/script.json` 已生成
-- 听觉轨与视觉轨已落盘
+- 听觉轨、视觉轨和情绪标注已落盘
+
+### `audio_founded`
+
+- `audio/voiceover.json` 已生成
+- `audio/bgm-selection.json` 已生成
+- `audio/beat-grid.json` 已生成
+
+### `global_timeline_initialized`
+
+- `timeline/global-timeline.json` 已生成
+- 全局时间网格已锁定
 
 ### `storyboard_planned`
 
 - `storyboard/storyboard.json` 已生成
-- scene 列表可供时间轴阶段消费
+- scene 列表已与音频时间网格对齐
 
 ### `timeline_built`
 
@@ -55,12 +66,14 @@
 created
   -> input_parsed
   -> script_generated
+  -> audio_founded
+  -> global_timeline_initialized
   -> storyboard_planned
   -> timeline_built
   -> render_planned
   -> completed
 
-created/input_parsed/script_generated/storyboard_planned/timeline_built/render_planned
+created/input_parsed/script_generated/audio_founded/global_timeline_initialized/storyboard_planned/timeline_built/render_planned
   -> failed
 ```
 

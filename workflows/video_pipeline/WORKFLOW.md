@@ -2,21 +2,36 @@
 
 ## Purpose
 
-`video_pipeline` 是 `cucumis-aigc` 的主工作流定义，描述从自然语言需求到本地视频产出的最小闭环。它不负责实现具体能力，而负责定义阶段顺序、每阶段目标、产物位置和人工介入点。
+`video_pipeline` 是 `cucumis-aigc` 的默认听觉驱动工作流定义，描述从自然语言需求到本地视频产出的标准闭环。它不负责实现具体能力，而负责定义阶段顺序、每阶段目标、产物位置和人工介入点。
 
 该 workflow 默认由 `skills/master_orchestrator/SKILL.md` 解释和推进。
 
 ## Workflow Goal
 
-第一版最小闭环是：
+第一版当前可执行的最小主链是：
 
 1. 输入解析
-2. 脚本生成
-3. 分镜规划
-4. 时间轴构建
-5. 渲染占位输出
+2. 脚本生成与情绪标注
+3. 音频基建
+4. 全局时间轴预构建
+5. 踩点分镜规划
 
-其目标不是一次性生成高质量最终视频，而是先建立一条能稳定运行、能持久化中间产物、能校验交接的主链路。
+整个默认标准链为：
+
+1. `input_parser`
+2. `script_writer`
+3. `audio_foundation`
+4. `global_timeline_initializer`
+5. `beat_sync_storyboard_planner`
+6. `keyframe_planner`
+7. `prompt_engineer`
+8. `image_generator`
+9. `constrained_video_generator`
+10. `subtitle_asset_manager`
+11. `timeline_builder`
+12. `ffmpeg_renderer_reviewer`
+
+其目标不是一次性生成高质量最终视频，而是先建立一条能稳定运行、能持久化中间产物、能校验交接的听觉驱动主链路。
 
 ## Stage Order
 
@@ -29,26 +44,28 @@
 ### 2. `script_writer`
 
 - 读取结构化任务配置
-- 产出脚本文档
+- 产出带情绪标注的脚本文档
 - 写入 `projects/<project>/script/script.json`
 
-### 3. `storyboard_planner`
+### 3. `audio_foundation`
 
-- 读取脚本
-- 产出 scene 级分镜结构
+- 读取带情绪标注的脚本
+- 产出配音时间戳、BGM 匹配结果和节拍网格
+- 写入 `projects/<project>/audio/voiceover.json`
+- 写入 `projects/<project>/audio/bgm-selection.json`
+- 写入 `projects/<project>/audio/beat-grid.json`
+
+### 4. `global_timeline_initializer`
+
+- 读取音频基建产物
+- 产出全局时间网格
+- 写入 `projects/<project>/timeline/global-timeline.json`
+
+### 5. `beat_sync_storyboard_planner`
+
+- 读取脚本和全局时间网格
+- 产出严格限时的分镜
 - 写入 `projects/<project>/storyboard/storyboard.json`
-
-### 4. `timeline_builder`
-
-- 读取分镜和已有素材引用
-- 产出渲染器无关的时间轴
-- 写入 `projects/<project>/timeline/timeline.json`
-
-### 5. `ffmpeg_renderer`
-
-- 读取时间轴
-- 生成渲染计划或占位输出
-- 写入 `projects/<project>/outputs/render-plan.json`
 
 ## Required Runtime Behavior
 
@@ -57,6 +74,7 @@
 - 每一阶段只读自己声明的输入，不隐式依赖其他临时文件
 - 每一阶段失败时必须写错误事件，并保留已生成产物
 - 主流程允许人工中断与重跑，但不得覆盖未明确替换的产物
+- 分镜及其后续阶段必须服从已锁定的音频时间网格
 
 ## Project Layout Assumption
 

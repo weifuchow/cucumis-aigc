@@ -41,9 +41,41 @@
 - `workflow.stage.completed`
 
 ### `storyboard_planner`
+### `audio_foundation`
 
 **Reads**
 - `script/script.json`
+
+**Writes**
+- `audio/voiceover.json`
+- `audio/bgm-selection.json`
+- `audio/beat-grid.json`
+
+**Emits**
+- `workflow.stage.started`
+- `artifact.written`
+- `workflow.stage.completed`
+
+### `global_timeline_initializer`
+
+**Reads**
+- `audio/voiceover.json`
+- `audio/beat-grid.json`
+- `audio/bgm-selection.json`
+
+**Writes**
+- `timeline/global-timeline.json`
+
+**Emits**
+- `workflow.stage.started`
+- `artifact.written`
+- `workflow.stage.completed`
+
+### `beat_sync_storyboard_planner`
+
+**Reads**
+- `script/script.json`
+- `timeline/global-timeline.json`
 
 **Writes**
 - `storyboard/storyboard.json`
@@ -57,6 +89,7 @@
 
 **Reads**
 - `storyboard/storyboard.json`
+- `timeline/global-timeline.json`
 - `assets/manifest.json` if present
 
 **Writes**
@@ -67,7 +100,7 @@
 - `artifact.written`
 - `workflow.stage.completed`
 
-### `ffmpeg_renderer`
+### `ffmpeg_renderer_reviewer`
 
 **Reads**
 - `timeline/timeline.json`
