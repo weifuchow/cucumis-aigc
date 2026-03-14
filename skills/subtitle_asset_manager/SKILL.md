@@ -6,4 +6,16 @@
 
 ## Status
 
-占位中。后续接入素材清单聚合和字幕导出逻辑。
+第一版已可执行，生成结构化字幕并聚合素材 manifest。
+
+## Reads
+
+- `projects/<project>/audio/voiceover.json`
+- `projects/<project>/storyboard/storyboard.json`
+- `projects/<project>/video/clips.json`
+- `projects/<project>/assets/manifest.json` if present
+
+## Writes
+
+- `projects/<project>/subtitles/subtitles.json`
+- `projects/<project>/assets/manifest.json`

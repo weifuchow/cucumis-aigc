@@ -45,6 +45,10 @@ class WorkspaceScriptsTest(unittest.TestCase):
             self.assertTrue((project_dir / "audio" / "usage.json").exists())
             self.assertTrue((project_dir / "timeline" / "global-timeline.json").exists())
             self.assertTrue((project_dir / "timeline" / "timeline.json").exists())
+            self.assertTrue((project_dir / "keyframes" / "keyframes.json").exists())
+            self.assertTrue((project_dir / "prompts" / "prompts.json").exists())
+            self.assertTrue((project_dir / "subtitles" / "subtitles.json").exists())
+            self.assertTrue((project_dir / "assets" / "manifest.json").exists())
             self.assertTrue((project_dir / "review" / "review-report.json").exists())
             self.assertTrue((project_dir / "review" / "observer-summary.md").exists())
             self.assertTrue((project_dir / "video" / "clips.json").exists())
@@ -55,6 +59,9 @@ class WorkspaceScriptsTest(unittest.TestCase):
             self.assertTrue((project_dir / "script").is_dir())
             self.assertTrue((project_dir / "storyboard").is_dir())
             self.assertTrue((project_dir / "timeline").is_dir())
+            self.assertTrue((project_dir / "keyframes").is_dir())
+            self.assertTrue((project_dir / "prompts").is_dir())
+            self.assertTrue((project_dir / "subtitles").is_dir())
             self.assertTrue((project_dir / "video").is_dir())
             self.assertTrue((project_dir / "costs").is_dir())
             self.assertTrue((project_dir / "assets").is_dir())
@@ -137,12 +144,22 @@ class WorkspaceScriptsTest(unittest.TestCase):
                 '{"metadata": {}, "tracks": [], "segments": [], "output": {"format": "mp4", "aspect_ratio": "9:16"}}',
                 encoding="utf-8",
             )
+            (project_dir / "keyframes").mkdir()
+            (project_dir / "keyframes" / "keyframes.json").write_text('{"keyframes": []}', encoding="utf-8")
+            (project_dir / "prompts").mkdir()
+            (project_dir / "prompts" / "prompts.json").write_text('{"prompts": []}', encoding="utf-8")
+            (project_dir / "subtitles").mkdir()
+            (project_dir / "subtitles" / "subtitles.json").write_text('{"entries": []}', encoding="utf-8")
             (project_dir / "review").mkdir()
             (project_dir / "review" / "review-report.json").write_text("{}", encoding="utf-8")
             (project_dir / "review" / "observer-summary.md").write_text("# Demo\n", encoding="utf-8")
             (project_dir / "costs").mkdir()
             (project_dir / "costs" / "poe-usage.jsonl").write_text("", encoding="utf-8")
             (project_dir / "assets").mkdir()
+            (project_dir / "assets" / "manifest.json").write_text(
+                '{"images": [], "subtitles": [], "audio": [], "videos": []}',
+                encoding="utf-8",
+            )
             (project_dir / "outputs").mkdir()
             (project_dir / "outputs" / "render-plan.json").write_text("{}", encoding="utf-8")
 

@@ -189,6 +189,72 @@ class ReviewObserverScriptsTest(unittest.TestCase):
         self.assertIn("Recent decision: `advance` - audio assets ready", summary)
         self.assertIn("Review status: `ready`", summary)
 
+    def test_review_project_warns_missing_prerequisites_for_prompt_engineer(self) -> None:
+        result = subprocess.run(
+            [
+                "python3",
+                str(REPO_ROOT / "scripts" / "update_orchestration_state.py"),
+                "--project",
+                str(self.project_dir),
+                "--current-stage",
+                "keyframe_planner",
+                "--next-stage",
+                "prompt_engineer",
+                "--completed-stage",
+                "input_parser",
+                "--completed-stage",
+                "script_writer",
+                "--completed-stage",
+                "audio_foundation",
+                "--completed-stage",
+                "global_timeline_initializer",
+                "--completed-stage",
+                "beat_sync_storyboard_planner",
+                "--workflow",
+                "video_pipeline",
+                "--planned-stage",
+                "input_parser",
+                "--planned-stage",
+                "script_writer",
+                "--planned-stage",
+                "audio_foundation",
+                "--planned-stage",
+                "global_timeline_initializer",
+                "--planned-stage",
+                "beat_sync_storyboard_planner",
+                "--planned-stage",
+                "keyframe_planner",
+                "--planned-stage",
+                "prompt_engineer",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        (self.project_dir / "script" / "script.json").write_text(
+            json.dumps({"audio_track": [], "visual_track": [], "beats": [], "emotion_markers": [], "turning_points": []}),
+            encoding="utf-8",
+        )
+        (self.project_dir / "audio" / "voiceover.json").write_text('{"segments": []}', encoding="utf-8")
+        (self.project_dir / "audio" / "bgm-selection.json").write_text('{"track_id": "bgm-1"}', encoding="utf-8")
+        (self.project_dir / "audio" / "beat-grid.json").write_text('{"beats": []}', encoding="utf-8")
+        (self.project_dir / "timeline" / "global-timeline.json").write_text(
+            '{"narration_windows": [], "beat_anchors": [], "transition_windows": [], "reserved_silence_gaps": [], "scene_timing_slots": []}',
+            encoding="utf-8",
+        )
+        (self.project_dir / "storyboard" / "storyboard.json").write_text(
+            json.dumps({"scenes": [{"scene_id": "scene-1", "start_time": 0, "end_time": 2, "duration_seconds": 2}]}),
+            encoding="utf-8",
+        )
+        (self.project_dir / "keyframes" / "keyframes.json").unlink(missing_ok=True)
+
+        review_result = run_script("review_project.py", self.project_dir)
+        self.assertEqual(review_result.returncode, 0, review_result.stderr)
+
+        report = json.loads((self.project_dir / "review" / "review-report.json").read_text(encoding="utf-8"))
+        self.assertEqual(report["status"], "blocked")
+        self.assertIn("keyframes/keyframes.json", report["missing_artifacts"])
+
 
 if __name__ == "__main__":
     unittest.main()

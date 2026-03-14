@@ -6,7 +6,7 @@
 
 ## Status
 
-占位中。后续接入模型提示词模板、图片生成脚本和素材落盘约定。
+第一版已可执行，生成调试用 mock 图像提示资产并写入素材清单。
 
 ## Planned Reads
 
@@ -17,3 +17,8 @@
 
 - `projects/<project>/assets/images/`
 - `projects/<project>/assets/manifest.json`
+
+## Runtime Expectations
+
+- 需要为每个 prompt 生成可追溯的占位资产记录
+- `assets/manifest.json` 的 `images` 字段必须可被后续阶段复用

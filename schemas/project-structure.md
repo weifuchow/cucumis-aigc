@@ -28,6 +28,12 @@ projects/<project-name>/
     usage.json
   storyboard/
     storyboard.json
+  keyframes/
+    keyframes.json
+  prompts/
+    prompts.json
+  subtitles/
+    subtitles.json
   video/
     clips.json
     requests.json
@@ -42,6 +48,7 @@ projects/<project-name>/
     poe-usage.jsonl
   assets/
     manifest.json
+    images/
   outputs/
     render-plan.json
 ```
@@ -54,7 +61,11 @@ projects/<project-name>/
 - `audio/` 保存配音时间戳、BGM 匹配和节拍网格
 - `audio/tts-response.json` 和 `audio/usage.json` 保存 Poe 调用摘要与成本信息
 - `video/` 保存逐镜头视频生成请求、产物和成本信息
+- `keyframes/` 保存每个 scene 的关键视觉锚点
+- `prompts/` 保存模型可执行提示词
+- `subtitles/` 保存结构化字幕条目
 - `timeline/global-timeline.json` 保存音频驱动的全局时间网格
+- `assets/manifest.json` 聚合图片、字幕、音频、视频资产索引
 - `review/` 保存结构化审查结果和人类可读摘要
 - `costs/poe-usage.jsonl` 聚合所有 Poe 调用的成本日志
 - 所有 JSON 文件都应可被标准库解析
@@ -75,7 +86,4 @@ projects/<project-name>/
 
 后续可增加：
 
-- `subtitles/`
-- `keyframes/`
-- `images/`
 - `video/`

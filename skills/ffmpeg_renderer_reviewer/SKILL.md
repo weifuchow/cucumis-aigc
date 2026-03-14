@@ -6,4 +6,13 @@
 
 ## Status
 
-占位中。后续接入真实渲染和质检逻辑。
+第一版已可执行：当前输出稳定 `render-plan` 并执行基础校验；
+真实 ffmpeg 导出将在后续阶段继续增强。
+
+## Reads
+
+- `projects/<project>/timeline/timeline.json`
+
+## Writes
+
+- `projects/<project>/outputs/render-plan.json`

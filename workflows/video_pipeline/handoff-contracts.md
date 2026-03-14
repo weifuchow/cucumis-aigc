@@ -84,11 +84,88 @@
 - `artifact.written`
 - `workflow.stage.completed`
 
+### `keyframe_planner`
+
+**Reads**
+- `storyboard/storyboard.json`
+
+**Writes**
+- `keyframes/keyframes.json`
+
+**Emits**
+- `workflow.stage.started`
+- `artifact.written`
+- `workflow.stage.completed`
+
+### `prompt_engineer`
+
+**Reads**
+- `storyboard/storyboard.json`
+- `keyframes/keyframes.json`
+
+**Writes**
+- `prompts/prompts.json`
+
+**Emits**
+- `workflow.stage.started`
+- `artifact.written`
+- `workflow.stage.completed`
+
+### `image_generator`
+
+**Reads**
+- `prompts/prompts.json`
+
+**Writes**
+- `assets/manifest.json`
+- `assets/images/*` placeholder prompt assets in first version
+
+**Emits**
+- `workflow.stage.started`
+- `artifact.written`
+- `workflow.stage.completed`
+
+### `constrained_video_generator`
+
+**Reads**
+- `storyboard/storyboard.json`
+- `input/input.json`
+
+**Writes**
+- `video/clips.json`
+- `video/requests.json`
+- `video/usage.json`
+- `costs/poe-usage.jsonl` append line
+
+**Emits**
+- `workflow.stage.started`
+- `artifact.written`
+- `workflow.stage.completed`
+
+### `subtitle_asset_manager`
+
+**Reads**
+- `audio/voiceover.json`
+- `storyboard/storyboard.json`
+- `video/clips.json`
+- `assets/manifest.json` if present
+
+**Writes**
+- `subtitles/subtitles.json`
+- `assets/manifest.json`
+
+**Emits**
+- `workflow.stage.started`
+- `artifact.written`
+- `workflow.stage.completed`
+
 ### `timeline_builder`
 
 **Reads**
 - `storyboard/storyboard.json`
 - `timeline/global-timeline.json`
+- `video/clips.json`
+- `audio/voiceover.json`
 - `assets/manifest.json` if present
 
 **Writes**

@@ -7,6 +7,10 @@
 ## Reads
 
 - `projects/<project>/storyboard/storyboard.json`
+- `projects/<project>/timeline/global-timeline.json`
+- `projects/<project>/video/clips.json`
+- `projects/<project>/audio/voiceover.json`
+- `projects/<project>/audio/bgm-selection.json`
 - `projects/<project>/assets/manifest.json` if present
 
 ## Writes

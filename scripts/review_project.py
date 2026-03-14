@@ -29,6 +29,15 @@ STAGE_ARTIFACTS = {
     ],
     "global_timeline_initializer": [pathlib.Path("timeline/global-timeline.json")],
     "beat_sync_storyboard_planner": [pathlib.Path("storyboard/storyboard.json")],
+    "keyframe_planner": [pathlib.Path("keyframes/keyframes.json")],
+    "prompt_engineer": [pathlib.Path("prompts/prompts.json")],
+    "image_generator": [pathlib.Path("assets/manifest.json")],
+    "constrained_video_generator": [
+        pathlib.Path("video/clips.json"),
+        pathlib.Path("video/requests.json"),
+        pathlib.Path("video/usage.json"),
+    ],
+    "subtitle_asset_manager": [pathlib.Path("subtitles/subtitles.json"), pathlib.Path("assets/manifest.json")],
     "timeline_builder": [pathlib.Path("timeline/timeline.json")],
     "ffmpeg_renderer_reviewer": [pathlib.Path("outputs/render-plan.json")],
 }
@@ -123,9 +132,20 @@ def main() -> int:
                 "script/script.json",
                 "timeline/global-timeline.json",
             ],
+            "keyframe_planner": ["storyboard/storyboard.json"],
+            "prompt_engineer": ["storyboard/storyboard.json", "keyframes/keyframes.json"],
+            "image_generator": ["prompts/prompts.json"],
+            "constrained_video_generator": ["storyboard/storyboard.json"],
+            "subtitle_asset_manager": [
+                "audio/voiceover.json",
+                "storyboard/storyboard.json",
+                "video/clips.json",
+            ],
             "timeline_builder": [
                 "storyboard/storyboard.json",
                 "timeline/global-timeline.json",
+                "video/clips.json",
+                "audio/voiceover.json",
             ],
             "ffmpeg_renderer_reviewer": ["timeline/timeline.json"],
         }.get(next_stage, [])

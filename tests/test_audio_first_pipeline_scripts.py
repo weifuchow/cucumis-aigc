@@ -55,6 +55,13 @@ class AudioFirstPipelineScriptsTest(unittest.TestCase):
             encoding="utf-8",
         )
 
+    def run_until_storyboard(self) -> None:
+        self.assertEqual(run_script("run_input_parser.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_script_writer.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_audio_foundation.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_global_timeline_initializer.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_beat_sync_storyboard_planner.py", self.project_dir).returncode, 0)
+
     def test_run_input_parser_writes_music_emotion_and_pacing(self) -> None:
         result = run_script("run_input_parser.py", self.project_dir)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -141,11 +148,7 @@ class AudioFirstPipelineScriptsTest(unittest.TestCase):
         self.assertIn("motion_intent", first_scene)
 
     def test_run_constrained_video_generator_writes_video_artifacts(self) -> None:
-        self.assertEqual(run_script("run_input_parser.py", self.project_dir).returncode, 0)
-        self.assertEqual(run_script("run_script_writer.py", self.project_dir).returncode, 0)
-        self.assertEqual(run_script("run_audio_foundation.py", self.project_dir).returncode, 0)
-        self.assertEqual(run_script("run_global_timeline_initializer.py", self.project_dir).returncode, 0)
-        self.assertEqual(run_script("run_beat_sync_storyboard_planner.py", self.project_dir).returncode, 0)
+        self.run_until_storyboard()
         result = run_script("run_constrained_video_generator.py", self.project_dir)
         self.assertEqual(result.returncode, 0, result.stderr)
 
@@ -159,13 +162,61 @@ class AudioFirstPipelineScriptsTest(unittest.TestCase):
         self.assertEqual(usage["model"], "veo-3.1-fast")
         self.assertIn(json.loads(cost_lines[-1])["skill"], {"audio_foundation", "constrained_video_generator"})
 
-    def test_run_timeline_builder_writes_timeline_artifact(self) -> None:
-        self.assertEqual(run_script("run_input_parser.py", self.project_dir).returncode, 0)
-        self.assertEqual(run_script("run_script_writer.py", self.project_dir).returncode, 0)
-        self.assertEqual(run_script("run_audio_foundation.py", self.project_dir).returncode, 0)
-        self.assertEqual(run_script("run_global_timeline_initializer.py", self.project_dir).returncode, 0)
-        self.assertEqual(run_script("run_beat_sync_storyboard_planner.py", self.project_dir).returncode, 0)
+    def test_run_keyframe_planner_writes_keyframes(self) -> None:
+        self.run_until_storyboard()
+
+        result = run_script("run_keyframe_planner.py", self.project_dir)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        payload = json.loads((self.project_dir / "keyframes" / "keyframes.json").read_text(encoding="utf-8"))
+        self.assertTrue(payload["keyframes"])
+        self.assertIn("scene_id", payload["keyframes"][0])
+
+    def test_run_prompt_engineer_writes_scene_prompts(self) -> None:
+        self.run_until_storyboard()
+        self.assertEqual(run_script("run_keyframe_planner.py", self.project_dir).returncode, 0)
+
+        result = run_script("run_prompt_engineer.py", self.project_dir)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        payload = json.loads((self.project_dir / "prompts" / "prompts.json").read_text(encoding="utf-8"))
+        self.assertTrue(payload["prompts"])
+        self.assertIn("positive_prompt", payload["prompts"][0])
+
+    def test_run_image_generator_writes_assets_manifest(self) -> None:
+        self.run_until_storyboard()
+        self.assertEqual(run_script("run_keyframe_planner.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_prompt_engineer.py", self.project_dir).returncode, 0)
+
+        result = run_script("run_image_generator.py", self.project_dir)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        payload = json.loads((self.project_dir / "assets" / "manifest.json").read_text(encoding="utf-8"))
+        self.assertIn("images", payload)
+        self.assertTrue(payload["images"])
+
+    def test_run_subtitle_asset_manager_writes_subtitles_and_manifest(self) -> None:
+        self.run_until_storyboard()
+        self.assertEqual(run_script("run_keyframe_planner.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_prompt_engineer.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_image_generator.py", self.project_dir).returncode, 0)
         self.assertEqual(run_script("run_constrained_video_generator.py", self.project_dir).returncode, 0)
+
+        result = run_script("run_subtitle_asset_manager.py", self.project_dir)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        subtitles = json.loads((self.project_dir / "subtitles" / "subtitles.json").read_text(encoding="utf-8"))
+        manifest = json.loads((self.project_dir / "assets" / "manifest.json").read_text(encoding="utf-8"))
+        self.assertTrue(subtitles["entries"])
+        self.assertTrue(manifest["subtitles"])
+
+    def test_run_timeline_builder_writes_timeline_artifact(self) -> None:
+        self.run_until_storyboard()
+        self.assertEqual(run_script("run_keyframe_planner.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_prompt_engineer.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_image_generator.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_constrained_video_generator.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_subtitle_asset_manager.py", self.project_dir).returncode, 0)
 
         result = run_script("run_timeline_builder.py", self.project_dir)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -178,12 +229,12 @@ class AudioFirstPipelineScriptsTest(unittest.TestCase):
         self.assertTrue(payload["segments"])
 
     def test_run_ffmpeg_renderer_reviewer_writes_render_plan(self) -> None:
-        self.assertEqual(run_script("run_input_parser.py", self.project_dir).returncode, 0)
-        self.assertEqual(run_script("run_script_writer.py", self.project_dir).returncode, 0)
-        self.assertEqual(run_script("run_audio_foundation.py", self.project_dir).returncode, 0)
-        self.assertEqual(run_script("run_global_timeline_initializer.py", self.project_dir).returncode, 0)
-        self.assertEqual(run_script("run_beat_sync_storyboard_planner.py", self.project_dir).returncode, 0)
+        self.run_until_storyboard()
+        self.assertEqual(run_script("run_keyframe_planner.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_prompt_engineer.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_image_generator.py", self.project_dir).returncode, 0)
         self.assertEqual(run_script("run_constrained_video_generator.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_subtitle_asset_manager.py", self.project_dir).returncode, 0)
         self.assertEqual(run_script("run_timeline_builder.py", self.project_dir).returncode, 0)
 
         result = run_script("run_ffmpeg_renderer_reviewer.py", self.project_dir)
@@ -202,12 +253,12 @@ class AudioFirstPipelineScriptsTest(unittest.TestCase):
         self.assertGreater(payload["duration_seconds"], 0)
 
     def test_run_ffmpeg_renderer_reviewer_rejects_missing_required_tracks(self) -> None:
-        self.assertEqual(run_script("run_input_parser.py", self.project_dir).returncode, 0)
-        self.assertEqual(run_script("run_script_writer.py", self.project_dir).returncode, 0)
-        self.assertEqual(run_script("run_audio_foundation.py", self.project_dir).returncode, 0)
-        self.assertEqual(run_script("run_global_timeline_initializer.py", self.project_dir).returncode, 0)
-        self.assertEqual(run_script("run_beat_sync_storyboard_planner.py", self.project_dir).returncode, 0)
+        self.run_until_storyboard()
+        self.assertEqual(run_script("run_keyframe_planner.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_prompt_engineer.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_image_generator.py", self.project_dir).returncode, 0)
         self.assertEqual(run_script("run_constrained_video_generator.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_subtitle_asset_manager.py", self.project_dir).returncode, 0)
         self.assertEqual(run_script("run_timeline_builder.py", self.project_dir).returncode, 0)
 
         timeline_path = self.project_dir / "timeline" / "timeline.json"
@@ -218,6 +269,28 @@ class AudioFirstPipelineScriptsTest(unittest.TestCase):
         result = run_script("run_ffmpeg_renderer_reviewer.py", self.project_dir)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("missing required tracks", result.stderr)
+
+    def test_full_pipeline_smoke_runs_all_12_stages(self) -> None:
+        ordered_scripts = [
+            "run_input_parser.py",
+            "run_script_writer.py",
+            "run_audio_foundation.py",
+            "run_global_timeline_initializer.py",
+            "run_beat_sync_storyboard_planner.py",
+            "run_keyframe_planner.py",
+            "run_prompt_engineer.py",
+            "run_image_generator.py",
+            "run_constrained_video_generator.py",
+            "run_subtitle_asset_manager.py",
+            "run_timeline_builder.py",
+            "run_ffmpeg_renderer_reviewer.py",
+        ]
+        for script_name in ordered_scripts:
+            result = run_script(script_name, self.project_dir)
+            self.assertEqual(result.returncode, 0, f"{script_name}: {result.stderr}")
+
+        validate_result = run_script("validate_project.py", self.project_dir)
+        self.assertEqual(validate_result.returncode, 0, validate_result.stderr)
 
 
 if __name__ == "__main__":

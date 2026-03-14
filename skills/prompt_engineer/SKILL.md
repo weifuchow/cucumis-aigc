@@ -6,4 +6,13 @@
 
 ## Status
 
-占位中。后续接入真正的提示词工程逻辑。
+第一版已可执行，输出稳定结构化 scene prompts。
+
+## Reads
+
+- `projects/<project>/storyboard/storyboard.json`
+- `projects/<project>/keyframes/keyframes.json`
+
+## Writes
+
+- `projects/<project>/prompts/prompts.json`
