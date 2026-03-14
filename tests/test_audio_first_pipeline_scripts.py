@@ -65,6 +65,21 @@ class AudioFirstPipelineScriptsTest(unittest.TestCase):
             encoding="utf-8",
         )
 
+    def test_run_creative_brief_intake_generates_standard_brief(self) -> None:
+        (self.project_dir / "request.md").write_text("做一个关于城市更新的人文短视频", encoding="utf-8")
+        result = run_script("run_creative_brief_intake.py", self.project_dir)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        brief_path = self.project_dir / "brief" / "creative-brief.md"
+        self.assertTrue(brief_path.exists())
+        brief = brief_path.read_text(encoding="utf-8")
+        self.assertIn("# Creative Brief", brief)
+        self.assertIn("主题：做一个关于城市更新的人文短视频", brief)
+        self.assertIn("目标：", brief)
+
+        request_text = (self.project_dir / "request.md").read_text(encoding="utf-8")
+        self.assertIn("# Creative Brief", request_text)
+
     def run_until_storyboard(self) -> None:
         self.assertEqual(run_script("run_input_parser.py", self.project_dir).returncode, 0)
         self.assertEqual(run_script("run_script_writer.py", self.project_dir).returncode, 0)
@@ -307,6 +322,7 @@ class AudioFirstPipelineScriptsTest(unittest.TestCase):
 
     def test_full_pipeline_smoke_runs_all_12_stages(self) -> None:
         ordered_scripts = [
+            "run_creative_brief_intake.py",
             "run_input_parser.py",
             "run_script_writer.py",
             "run_audio_foundation.py",

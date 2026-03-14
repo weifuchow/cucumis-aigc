@@ -8,41 +8,49 @@
 
 ## Workflow Goal
 
-第一版当前已可执行并可调试的主链覆盖 12 个默认阶段。
-其中第 6 到 10 阶段当前为稳定 mock 产物实现，用于打通交接与调试闭环。
+第一版当前已可执行并可调试的主链覆盖 13 个默认阶段。
+其中第 7 到 11 阶段当前为稳定 mock 产物实现，用于打通交接与调试闭环。
 
 整个默认标准链为：
 
-1. `input_parser`
-2. `script_writer`
-3. `audio_foundation`
-4. `global_timeline_initializer`
-5. `beat_sync_storyboard_planner`
-6. `keyframe_planner`
-7. `prompt_engineer`
-8. `image_generator`
-9. `constrained_video_generator`
-10. `subtitle_asset_manager`
-11. `timeline_builder`
-12. `ffmpeg_renderer_reviewer`
+1. `creative_brief_intake`
+2. `input_parser`
+3. `script_writer`
+4. `audio_foundation`
+5. `global_timeline_initializer`
+6. `beat_sync_storyboard_planner`
+7. `keyframe_planner`
+8. `prompt_engineer`
+9. `image_generator`
+10. `constrained_video_generator`
+11. `subtitle_asset_manager`
+12. `timeline_builder`
+13. `ffmpeg_renderer_reviewer`
 
 其目标不是一次性生成高质量最终视频，而是先建立一条能稳定运行、能持久化中间产物、能校验交接的听觉驱动主链路。
 
 ## Stage Order
 
-### 1. `input_parser`
+### 1. `creative_brief_intake`
+
+- 读取客户原始一句话诉求或粗糙需求
+- 通过多轮引导补齐关键字段
+- 写入 `projects/<project>/brief/creative-brief.md`
+- 同步覆盖写入 `projects/<project>/request.md`
+
+### 2. `input_parser`
 
 - 读取用户任务输入
 - 产出结构化任务配置
 - 写入 `projects/<project>/input/input.json`
 
-### 2. `script_writer`
+### 3. `script_writer`
 
 - 读取结构化任务配置
 - 产出带情绪标注的脚本文档
 - 写入 `projects/<project>/script/script.json`
 
-### 3. `audio_foundation`
+### 4. `audio_foundation`
 
 - 读取带情绪标注的脚本
 - 产出配音时间戳、BGM 匹配结果和节拍网格
@@ -50,13 +58,13 @@
 - 写入 `projects/<project>/audio/bgm-selection.json`
 - 写入 `projects/<project>/audio/beat-grid.json`
 
-### 4. `global_timeline_initializer`
+### 5. `global_timeline_initializer`
 
 - 读取音频基建产物
 - 产出全局时间网格
 - 写入 `projects/<project>/timeline/global-timeline.json`
 
-### 5. `beat_sync_storyboard_planner`
+### 6. `beat_sync_storyboard_planner`
 
 - 读取脚本和全局时间网格
 - 产出严格限时的分镜

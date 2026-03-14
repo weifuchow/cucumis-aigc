@@ -20,6 +20,7 @@ BASELINE_REQUIRED_FILES = [
 ]
 
 STAGE_ARTIFACTS = {
+    "creative_brief_intake": [pathlib.Path("brief/creative-brief.md"), pathlib.Path("request.md")],
     "input_parser": [pathlib.Path("input/input.json")],
     "script_writer": [pathlib.Path("script/script.json")],
     "audio_foundation": [
@@ -121,6 +122,8 @@ def main() -> int:
     next_stage = state.get("next_stage")
     if isinstance(next_stage, str) and next_stage:
         prerequisites = {
+            "creative_brief_intake": ["request.md"],
+            "input_parser": ["request.md"],
             "script_writer": ["input/input.json"],
             "audio_foundation": ["script/script.json"],
             "global_timeline_initializer": [

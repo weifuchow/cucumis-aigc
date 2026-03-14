@@ -41,6 +41,7 @@ def main() -> int:
         "last_failed_stage": state.get("last_failed_stage"),
         "next_stage": state.get("next_stage"),
         "artifacts": {
+            "creative_brief_exists": (project_dir / "brief" / "creative-brief.md").is_file(),
             "input_exists": (project_dir / "input" / "input.json").is_file(),
             "script_exists": (project_dir / "script" / "script.json").is_file(),
             "storyboard_exists": (project_dir / "storyboard" / "storyboard.json").is_file(),

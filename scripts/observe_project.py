@@ -9,6 +9,7 @@ import sys
 
 
 ARTIFACT_LINES = [
+    ("brief/creative-brief.md", "Creative brief"),
     ("input/input.json", "Input"),
     ("script/script.json", "Script"),
     ("audio/voiceover.json", "Voiceover"),

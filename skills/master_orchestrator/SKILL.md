@@ -38,18 +38,19 @@ description: Inspect workflow state choose next stage and write orchestration de
 
 第一版采用“固定主链 + 条件跳过”模型，默认主链为：
 
-1. `input_parser`
-2. `script_writer`
-3. `audio_foundation`
-4. `global_timeline_initializer`
-5. `beat_sync_storyboard_planner`
-6. `keyframe_planner`
-7. `prompt_engineer`
-8. `image_generator`
-9. `constrained_video_generator`
-10. `subtitle_asset_manager`
-11. `timeline_builder`
-12. `ffmpeg_renderer_reviewer`
+1. `creative_brief_intake`
+2. `input_parser`
+3. `script_writer`
+4. `audio_foundation`
+5. `global_timeline_initializer`
+6. `beat_sync_storyboard_planner`
+7. `keyframe_planner`
+8. `prompt_engineer`
+9. `image_generator`
+10. `constrained_video_generator`
+11. `subtitle_asset_manager`
+12. `timeline_builder`
+13. `ffmpeg_renderer_reviewer`
 
 ## Required Outputs
 
