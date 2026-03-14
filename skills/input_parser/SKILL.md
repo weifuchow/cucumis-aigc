@@ -1,3 +1,8 @@
+---
+name: input-parser
+description: Parse raw project request text into structured input configuration fields. Use at workflow start before script generation.
+---
+
 # input_parser
 
 ## Purpose

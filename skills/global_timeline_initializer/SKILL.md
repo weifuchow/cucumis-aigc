@@ -1,3 +1,8 @@
+---
+name: global-timeline-initializer
+description: Build a global timeline grid from voiceover beat and bgm artifacts. Use when locking project level timing slots.
+---
+
 # global_timeline_initializer
 
 ## Purpose

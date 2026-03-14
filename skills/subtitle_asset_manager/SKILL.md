@@ -1,3 +1,8 @@
+---
+name: subtitle-asset-manager
+description: Generate subtitle entries from voiceover and update consolidated asset manifest. Use after video clips and before timeline assembly.
+---
+
 # subtitle_asset_manager
 
 ## Purpose

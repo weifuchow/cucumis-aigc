@@ -1,3 +1,8 @@
+---
+name: script-writer
+description: Generate emotion tagged script content from structured input artifacts. Use before audio foundation stage.
+---
+
 # script_writer
 
 ## Purpose

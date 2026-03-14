@@ -1,3 +1,8 @@
+---
+name: beat-sync-storyboard-planner
+description: Generate a beat aligned storyboard from script and global timeline artifacts. Use when scene timing must follow audio rhythm.
+---
+
 # beat_sync_storyboard_planner
 
 ## Purpose

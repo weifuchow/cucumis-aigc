@@ -1,3 +1,8 @@
+---
+name: audio-foundation
+description: Build audio timing foundations from script artifacts by producing voiceover segments beat grid and bgm selection. Use when preparing timeline anchors.
+---
+
 # audio_foundation
 
 ## Purpose

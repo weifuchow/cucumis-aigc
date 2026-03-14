@@ -1,3 +1,8 @@
+---
+name: master-orchestrator
+description: Inspect workflow state choose next stage and write orchestration decisions. Use for stage planning recovery and control flow.
+---
+
 # master_orchestrator
 
 ## Purpose
@@ -82,6 +87,28 @@
 - 所有主控决策都应尽量落盘，而不是只存在于瞬时推理里
 - 主控不应直接生成下游业务内容
 - 主控在分镜及其后续阶段前，必须优先检查音频时间锚点是否已建立
+
+## Context Hygiene
+
+- 主线程只保留控制面信息：目标、阶段决策、风险与验收结论
+- 长分析、批量代码阅读和重构执行优先交给子 agent
+- 子 agent 输入必须最小化：任务目标 + 关键文件路径 + 验收标准
+- 禁止把整段历史聊天原样转发给子 agent
+- 每轮结束必须写入 `orchestration/decisions.jsonl`，必要时刷新 `review/observer-summary.md`
+- 当主线程上下文变长时，先运行：
+  - `python3 scripts/session_handoff.py --project <project-path>`
+  - 再开新线程，仅用 handoff 文档续跑
+
+## Subagent Policy
+
+- 以下场景建议开启子 agent：
+  - 跨多个目录的大规模分析
+  - 大范围代码修改前的方案对比
+  - 长日志定位与回归验证
+- 以下场景不建议开启子 agent：
+  - 单文件小改
+  - 明确且短路径的命令执行
+  - 需要连续人机确认的细粒度交互
 
 ## Failure Behavior
 

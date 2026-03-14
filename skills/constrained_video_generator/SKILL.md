@@ -1,3 +1,8 @@
+---
+name: constrained-video-generator
+description: Generate constrained video clip metadata from storyboard scenes and project model settings. Use when producing video clips usage and request artifacts.
+---
+
 # constrained_video_generator
 
 ## Purpose

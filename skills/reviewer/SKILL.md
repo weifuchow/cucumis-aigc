@@ -1,3 +1,8 @@
+---
+name: reviewer
+description: Assess project readiness missing artifacts and next action into structured review report. Use for production readiness checks.
+---
+
 # reviewer
 
 ## Purpose

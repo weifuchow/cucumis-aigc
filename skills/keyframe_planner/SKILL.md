@@ -1,3 +1,8 @@
+---
+name: keyframe-planner
+description: Generate keyframe anchors for each storyboard scene. Use before prompt engineering and image generation.
+---
+
 # keyframe_planner
 
 ## Purpose

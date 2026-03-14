@@ -1,3 +1,8 @@
+---
+name: timeline-builder
+description: Assemble renderer agnostic timeline from storyboard audio video and asset artifacts. Use before renderer reviewer stage.
+---
+
 # timeline_builder
 
 ## Purpose

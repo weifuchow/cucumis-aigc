@@ -1,3 +1,8 @@
+---
+name: observer
+description: Summarize project progress artifacts and recent decisions into a readable overview report. Use for human status visibility.
+---
+
 # observer
 
 ## Purpose

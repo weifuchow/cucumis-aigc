@@ -1,3 +1,8 @@
+---
+name: prompt-engineer
+description: Translate storyboard and keyframe constraints into structured scene prompts. Use before image or video generation steps.
+---
+
 # prompt_engineer
 
 ## Purpose

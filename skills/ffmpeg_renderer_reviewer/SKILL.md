@@ -1,3 +1,8 @@
+---
+name: ffmpeg-renderer-reviewer
+description: Validate final timeline and generate render plan with optional ffmpeg export. Use when preparing final render outputs.
+---
+
 # ffmpeg_renderer_reviewer
 
 ## Purpose

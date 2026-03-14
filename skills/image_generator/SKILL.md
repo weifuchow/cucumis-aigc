@@ -1,3 +1,8 @@
+---
+name: image-generator
+description: Generate mock image asset records from prompts and update asset manifest. Use when visual reference assets are needed.
+---
+
 # image_generator
 
 ## Purpose
