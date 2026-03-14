@@ -20,6 +20,7 @@ BASELINE_REQUIRED_FILES = [
 ]
 
 STAGE_ARTIFACTS = {
+    "creative_design": [pathlib.Path("brief/creative-brief.md"), pathlib.Path("input/input.json")],
     "creative_brief_intake": [pathlib.Path("brief/creative-brief.md"), pathlib.Path("request.md")],
     "input_parser": [pathlib.Path("input/input.json")],
     "script_writer": [pathlib.Path("script/script.json")],
@@ -63,7 +64,7 @@ def read_json(path: pathlib.Path, fallback: object) -> object:
 def format_run_action(stage: str | None) -> str:
     if stage:
         return f"Run {stage}."
-    return "Run input_parser."
+    return "Run creative_design."
 
 
 def derive_recommendation(missing_artifacts: list[str], state: dict[str, object]) -> str:
@@ -79,7 +80,7 @@ def derive_recommendation(missing_artifacts: list[str], state: dict[str, object]
     if isinstance(current_stage, str) and current_stage:
         return f"Continue {current_stage}."
 
-    return "Run input_parser."
+    return "Run creative_design."
 
 
 def main() -> int:
@@ -126,6 +127,7 @@ def main() -> int:
     next_stage = state.get("next_stage")
     if isinstance(next_stage, str) and next_stage:
         prerequisites = {
+            "creative_design": ["request.md"],
             "creative_brief_intake": ["request.md"],
             "input_parser": ["request.md"],
             "script_writer": ["input/input.json"],

@@ -72,7 +72,7 @@ def derive_next_actions(
     if isinstance(next_stage, str) and next_stage:
         actions.append(f"Run `{next_stage}` and re-run `review_project.py`.")
     if not actions:
-        actions.append("Run input_parser.")
+        actions.append("Run creative_design.")
         actions.append("Run review_project.py, then observe_project.py.")
     unique_actions: list[str] = []
     for action in actions:
@@ -93,7 +93,7 @@ def build_handoff_markdown(
     generated_at = dt.datetime.now(dt.timezone.utc).isoformat()
     workflow = str(plan.get("workflow", "video_pipeline"))
     current_stage = str(state.get("current_stage") or "none")
-    next_stage = str(state.get("next_stage") or "input_parser")
+    next_stage = str(state.get("next_stage") or "creative_design")
     completed_stages = state.get("completed_stages", [])
     if not isinstance(completed_stages, list):
         completed_stages = []
@@ -190,7 +190,7 @@ def main() -> int:
             "status": "unknown",
             "missing_artifacts": [],
             "warnings": [],
-            "next_recommended_action": "Run input_parser.",
+            "next_recommended_action": "Run creative_design.",
         },
     )
     observer_path = project_dir / "review" / "observer-summary.md"

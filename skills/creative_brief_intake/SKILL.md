@@ -9,6 +9,8 @@ description: Guide users from a one-line idea to a complete creative brief throu
 
 把客户的一句话需求转成可执行的 `Creative Brief`，作为整个视频工作流的最前置输入质量门。
 
+默认主链已将本阶段并入 `creative_design`，本 skill 仍保留用于单独调试或重跑。
+
 ## Reads
 
 - 用户自然语言初始诉求（可能只有一句话）

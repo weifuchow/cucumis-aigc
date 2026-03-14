@@ -14,7 +14,7 @@
 
 ## Stage Contracts
 
-### `creative_brief_intake`
+### `creative_design`
 
 **Reads**
 - 客户初始自然语言诉求（通常在 `request.md`）
@@ -24,24 +24,14 @@
 - `brief/creative-brief.md`
 - `brief/intake.json`
 - `request.md`（标准化覆盖）
-
-**Emits**
-- `workflow.stage.started`
-- `artifact.written`
-- `workflow.stage.completed`
-
-### `input_parser`
-
-**Reads**
-- `request.md`（优先使用标准化 creative brief）
-
-**Writes**
 - `input/input.json`
 
 **Emits**
 - `workflow.stage.started`
 - `artifact.written`
 - `workflow.stage.completed`
+
+> 兼容说明：`creative_brief_intake` 与 `input_parser` 仍可独立运行，但默认主链按 `creative_design` 合并执行。
 
 ### `script_writer`
 

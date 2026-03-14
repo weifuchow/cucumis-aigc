@@ -80,8 +80,21 @@ class AudioFirstPipelineScriptsTest(unittest.TestCase):
         request_text = (self.project_dir / "request.md").read_text(encoding="utf-8")
         self.assertIn("# Creative Brief", request_text)
 
+    def test_run_creative_design_generates_brief_and_input(self) -> None:
+        (self.project_dir / "request.md").write_text("做一个关于夜市烟火与城市记忆的短片", encoding="utf-8")
+        result = run_script("run_creative_design.py", self.project_dir)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        brief_path = self.project_dir / "brief" / "creative-brief.md"
+        input_path = self.project_dir / "input" / "input.json"
+        self.assertTrue(brief_path.exists())
+        self.assertTrue(input_path.exists())
+
+        payload = json.loads(input_path.read_text(encoding="utf-8"))
+        self.assertEqual(payload["topic"], "做一个关于夜市烟火与城市记忆的短片")
+
     def run_until_storyboard(self) -> None:
-        self.assertEqual(run_script("run_input_parser.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_creative_design.py", self.project_dir).returncode, 0)
         self.assertEqual(run_script("run_script_writer.py", self.project_dir).returncode, 0)
         self.assertEqual(run_script("run_audio_foundation.py", self.project_dir).returncode, 0)
         self.assertEqual(run_script("run_global_timeline_initializer.py", self.project_dir).returncode, 0)
@@ -330,8 +343,7 @@ class AudioFirstPipelineScriptsTest(unittest.TestCase):
 
     def test_full_pipeline_smoke_runs_all_12_stages(self) -> None:
         ordered_scripts = [
-            "run_creative_brief_intake.py",
-            "run_input_parser.py",
+            "run_creative_design.py",
             "run_script_writer.py",
             "run_audio_foundation.py",
             "run_global_timeline_initializer.py",

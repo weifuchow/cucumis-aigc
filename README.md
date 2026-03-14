@@ -63,6 +63,7 @@ User Intent
 
 - `creative_brief_intake`
 - `input_parser`
+- `creative_design`（创意需求定稿，整合前两步）
 - `script_writer`
 - `audio_foundation`
 - `global_timeline_initializer`
@@ -106,11 +107,9 @@ User Intent
 
 `cucumis-aigc` 不追求一步到位地吐出完整视频，而是把视频生产拆成明确阶段。每个阶段都输出结构化结果，并为下一步提供约束。
 
-### 1. 输入解析
+### 1. 创意需求定稿
 
-`creative_brief_intake` 会先把客户一句话需求通过多轮引导补齐为标准 `Creative Brief`，并写回 `request.md`。
-
-`input_parser` 将自然语言需求转成标准化任务配置，提取主题、时长、风格、语言、画幅、配音、字幕和动态镜头等参数，并把音乐情绪诉求和节奏偏好一并结构化，形成后续步骤的统一输入。
+`creative_design` 是默认第一步，内部整合 `creative_brief_intake` 与 `input_parser`：先把一句话需求补齐为标准 `Creative Brief`，再产出 `input/input.json` 作为全链路结构化起点。
 
 ### 2. 脚本生成与情绪标注
 
@@ -234,6 +233,7 @@ cucumis-aigc/
     video_pipeline/
   skills/
     master_orchestrator/
+    creative_design/
     creative_brief_intake/
     input_parser/
     script_writer/

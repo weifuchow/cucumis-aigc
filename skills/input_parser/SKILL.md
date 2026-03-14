@@ -9,6 +9,8 @@ description: Parse raw project request text into structured input configuration 
 
 将原始任务请求转换成标准化输入配置，作为整条听觉驱动视频生产链的统一起点。
 
+默认主链已将本阶段并入 `creative_design`，本 skill 仍保留用于单独调试或局部重跑。
+
 ## Reads
 
 - `projects/<project>/request.md`

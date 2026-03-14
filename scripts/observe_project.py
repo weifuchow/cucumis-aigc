@@ -76,7 +76,7 @@ def main() -> int:
             "completed_stages": [],
             "missing_artifacts": [],
             "warnings": [],
-            "next_recommended_action": "Run input_parser.",
+            "next_recommended_action": "Run creative_design.",
         },
     )
     decision = read_recent_decision(project_dir / "orchestration" / "decisions.jsonl")
@@ -100,7 +100,7 @@ def main() -> int:
             "",
             f"- Project: `{project_dir.name}`",
             f"- Current stage: `{state.get('current_stage') or 'none'}`",
-            f"- Next stage: `{state.get('next_stage') or 'input_parser'}`",
+            f"- Next stage: `{state.get('next_stage') or 'creative_design'}`",
             f"- Review status: `{review.get('status', 'in_progress')}`",
             f"- Last checked: `{review.get('checked_at', '')}`",
             "",
@@ -126,7 +126,7 @@ def main() -> int:
             "",
             "## Next Step",
             "",
-            f"- {review.get('next_recommended_action', 'Run input_parser.')}",
+            f"- {review.get('next_recommended_action', 'Run creative_design.')}",
             "",
         ]
     )

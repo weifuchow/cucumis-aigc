@@ -249,7 +249,7 @@ class OrchestrationScriptsTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             output_path = pathlib.Path(result.stdout.strip())
             content = output_path.read_text(encoding="utf-8")
-            self.assertIn("Run input_parser.", content)
+            self.assertIn("Run creative_design.", content)
 
 
 if __name__ == "__main__":

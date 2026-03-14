@@ -1,0 +1,4 @@
+interface:
+  display_name: "Creative Design"
+  short_description: "Run creative brief intake and input parsing as one integrated first stage"
+  default_prompt: "Use creative_design as the first workflow stage to standardize request.md and write input/input.json."

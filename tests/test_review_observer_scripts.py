@@ -50,7 +50,7 @@ class ReviewObserverScriptsTest(unittest.TestCase):
         self.assertEqual(report["status"], "ready")
         self.assertEqual(report["completed_stages"], [])
         self.assertEqual(report["missing_artifacts"], [])
-        self.assertEqual(report["next_recommended_action"], "Run input_parser.")
+        self.assertEqual(report["next_recommended_action"], "Run creative_design.")
 
     def test_review_project_blocks_inconsistent_completed_stage(self) -> None:
         result = subprocess.run(
