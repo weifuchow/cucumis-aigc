@@ -7,6 +7,7 @@ import json
 import pathlib
 import shutil
 import subprocess
+import tempfile
 from typing import Any
 
 from poe.client import load_poe_config
@@ -40,7 +41,7 @@ def as_float(value: object, fallback: float) -> float:
     return fallback
 
 
-def load_image_map(project_dir: pathlib.Path) -> dict[str, str]:
+def load_scene_images(project_dir: pathlib.Path) -> dict[str, list[dict[str, Any]]]:
     manifest_path = project_dir / "assets" / "manifest.json"
     if not manifest_path.is_file():
         return {}
@@ -49,18 +50,26 @@ def load_image_map(project_dir: pathlib.Path) -> dict[str, str]:
     except (ValueError, json.JSONDecodeError):
         return {}
 
-    image_map: dict[str, str] = {}
+    scene_images: dict[str, list[dict[str, Any]]] = {}
     images = manifest.get("images")
     if not isinstance(images, list):
-        return image_map
+        return scene_images
     for item in images:
         if not isinstance(item, dict):
             continue
         scene_id = item.get("scene_id")
         path = item.get("path")
         if isinstance(scene_id, str) and scene_id and isinstance(path, str) and path:
-            image_map[scene_id] = path
-    return image_map
+            scene_images.setdefault(scene_id, []).append(item)
+    for scene_id, items in scene_images.items():
+        items.sort(
+            key=lambda item: (
+                int(item.get("frame_index", 1)) if isinstance(item.get("frame_index", 1), int) else 1,
+                str(item.get("asset_id", "")),
+            )
+        )
+        scene_images[scene_id] = items
+    return scene_images
 
 
 def should_use_static_clip(scene: dict[str, Any]) -> bool:
@@ -119,6 +128,88 @@ def render_static_clip(
     return True, str(output_path.relative_to(project_dir))
 
 
+def render_image_sequence_clip(
+    *,
+    ffmpeg_binary: str,
+    project_dir: pathlib.Path,
+    scene_id: str,
+    image_paths: list[str],
+    duration_seconds: float,
+) -> tuple[bool, str]:
+    resolved_paths: list[pathlib.Path] = []
+    for image_path in image_paths:
+        source_path = pathlib.Path(image_path)
+        if not source_path.is_absolute():
+            source_path = project_dir / source_path
+        if not source_path.is_file():
+            return False, f"image not found for sequence render: {image_path}"
+        resolved_paths.append(source_path)
+    if not resolved_paths:
+        return False, "no images available for sequence render"
+
+    safe_duration = max(round(duration_seconds, 2), 0.8)
+    per_frame_duration = max(0.35, safe_duration / max(1, len(resolved_paths)))
+    output_path = project_dir / "video" / "static" / f"{scene_id}.mp4"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.NamedTemporaryFile("w", suffix=".ffconcat", delete=False, encoding="utf-8") as handle:
+        concat_path = pathlib.Path(handle.name)
+        handle.write("ffconcat version 1.0\n")
+        for image_path in resolved_paths:
+            escaped = str(image_path).replace("'", "'\\''")
+            handle.write(f"file '{escaped}'\n")
+            handle.write(f"duration {per_frame_duration:.3f}\n")
+        escaped_last = str(resolved_paths[-1]).replace("'", "'\\''")
+        handle.write(f"file '{escaped_last}'\n")
+
+    command = [
+        ffmpeg_binary,
+        "-y",
+        "-f",
+        "concat",
+        "-safe",
+        "0",
+        "-i",
+        str(concat_path),
+        "-vf",
+        (
+            "scale=720:1280:force_original_aspect_ratio=decrease,"
+            "pad=720:1280:(ow-iw)/2:(oh-ih)/2,"
+            "fps=30,"
+            "format=yuv420p"
+        ),
+        "-t",
+        str(safe_duration),
+        "-c:v",
+        "libx264",
+        "-pix_fmt",
+        "yuv420p",
+        str(output_path),
+    ]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True)
+    finally:
+        concat_path.unlink(missing_ok=True)
+    if result.returncode != 0 or not output_path.is_file():
+        return False, (result.stderr or "ffmpeg sequence render failed").strip()[-500:]
+    return True, str(output_path.relative_to(project_dir))
+
+
+def should_use_local_image_clip(scene: dict[str, Any], scene_images: list[dict[str, Any]]) -> bool:
+    if not scene_images:
+        return False
+    asset_mode = str(scene.get("asset_mode", "")).lower()
+    motion_intent = str(scene.get("motion_intent", "")).lower()
+    expensive_motion = {"fast_push", "black_flash", "whip_pan", "handheld"}
+    if motion_intent in expensive_motion:
+        return False
+    if asset_mode == "mixed":
+        return len(scene_images) >= 3
+    if should_use_static_clip(scene):
+        return True
+    return len(scene_images) >= 2
+
+
 def main() -> int:
     args = parse_args()
     project_dir = pathlib.Path(args.project).resolve()
@@ -130,7 +221,7 @@ def main() -> int:
         raise ValueError("storyboard/scenes must be a non-empty array")
 
     ffmpeg_available = shutil.which(args.ffmpeg_binary) is not None
-    image_map = load_image_map(project_dir)
+    scene_images = load_scene_images(project_dir)
     static_clip_errors: list[str] = []
     local_static_clips: dict[str, dict[str, Any]] = {}
     dynamic_scenes: list[dict[str, Any]] = []
@@ -142,21 +233,34 @@ def main() -> int:
         if not scene_id:
             continue
         duration = as_float(scene.get("duration_seconds"), 2.0)
-        if should_use_static_clip(scene) and ffmpeg_available and scene_id in image_map:
-            ok, output_or_error = render_static_clip(
-                ffmpeg_binary=args.ffmpeg_binary,
-                project_dir=project_dir,
-                image_path=image_map[scene_id],
-                scene_id=scene_id,
-                duration_seconds=duration,
-            )
+        scene_assets = scene_images.get(scene_id, [])
+        image_paths = [str(item.get("path", "")) for item in scene_assets if isinstance(item.get("path"), str)]
+        if should_use_local_image_clip(scene, scene_assets) and ffmpeg_available and image_paths:
+            if len(image_paths) == 1:
+                ok, output_or_error = render_static_clip(
+                    ffmpeg_binary=args.ffmpeg_binary,
+                    project_dir=project_dir,
+                    image_path=image_paths[0],
+                    scene_id=scene_id,
+                    duration_seconds=duration,
+                )
+                source_mode = "static_ffmpeg"
+            else:
+                ok, output_or_error = render_image_sequence_clip(
+                    ffmpeg_binary=args.ffmpeg_binary,
+                    project_dir=project_dir,
+                    scene_id=scene_id,
+                    image_paths=image_paths,
+                    duration_seconds=duration,
+                )
+                source_mode = "image_sequence_ffmpeg"
             if ok:
                 local_static_clips[scene_id] = {
                     "scene_id": scene_id,
                     "duration_seconds": duration,
                     "url": output_or_error,
                     "motion_intent": scene.get("motion_intent", "hold"),
-                    "source_mode": "static_ffmpeg",
+                    "source_mode": source_mode,
                 }
             else:
                 static_clip_errors.append(f"{scene_id}: {output_or_error}")
@@ -244,6 +348,7 @@ def main() -> int:
             "dynamic_clip_count": dynamic_count,
             "static_clip_errors": static_clip_errors,
             "ffmpeg_available": ffmpeg_available,
+            "local_image_scene_ids": sorted(local_static_clips.keys()),
         },
     }
     usage_payload = {

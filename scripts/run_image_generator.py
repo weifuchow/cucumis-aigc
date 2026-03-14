@@ -144,6 +144,28 @@ def load_script_optional(path: pathlib.Path) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
+def load_storyboard_scene_map(path: pathlib.Path) -> dict[str, dict[str, Any]]:
+    if not path.is_file():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    scenes = payload.get("scenes")
+    if not isinstance(scenes, list):
+        return {}
+    scene_map: dict[str, dict[str, Any]] = {}
+    for scene in scenes:
+        if not isinstance(scene, dict):
+            continue
+        scene_id = scene.get("scene_id")
+        if isinstance(scene_id, str) and scene_id:
+            scene_map[scene_id] = scene
+    return scene_map
+
+
 def infer_subject(task_input: dict[str, Any], script_payload: dict[str, Any]) -> str:
     title = str(script_payload.get("title", ""))
     topic = str(task_input.get("topic", ""))
@@ -292,6 +314,18 @@ def build_scene_prompt_record(
     }
 
 
+def infer_scene_frame_count(scene_meta: dict[str, Any]) -> int:
+    asset_mode = str(scene_meta.get("asset_mode", "")).lower()
+    motion_intent = str(scene_meta.get("motion_intent", "")).lower()
+    if asset_mode == "static":
+        return 2
+    if motion_intent in {"hold", "slow_pan", "locked"}:
+        return 2
+    if motion_intent in {"mixed", "fast_push", "black_flash", "whip_pan"}:
+        return 1
+    return 1
+
+
 def main() -> int:
     args = parse_args()
     project_dir = pathlib.Path(args.project).resolve()
@@ -420,8 +454,11 @@ def main() -> int:
         }
 
     anchor_ids = [str(item.get("anchor_id", "")) for item in baselines if isinstance(item, dict)]
+    scene_map = load_storyboard_scene_map(project_dir / "storyboard" / "storyboard.json")
     scene_prompt_records: list[dict[str, Any]] = []
     scene_generation_prompts: list[dict[str, Any]] = []
+    frame_prompt_lookup: dict[str, dict[str, Any]] = {}
+    scene_frame_plan: dict[str, int] = {}
     for index, prompt in enumerate(prompts, start=1):
         record = build_scene_prompt_record(
             prompt=prompt,
@@ -431,16 +468,31 @@ def main() -> int:
             default_aspect_ratio=default_aspect_ratio,
         )
         scene_prompt_records.append(record)
-        scene_generation_prompts.append(
-            {
+        scene_meta = scene_map.get(str(record["scene_id"]), {})
+        frame_count = infer_scene_frame_count(scene_meta)
+        scene_frame_plan[str(record["scene_id"])] = frame_count
+        for frame_index in range(1, frame_count + 1):
+            frame_prompt_id = f"{record['prompt_id']}-f{frame_index}"
+            frame_positive_prompt = (
+                f"{record['full_prompt']}; montage_frame:{frame_index}/{frame_count}; "
+                "subtle angle/parallax change while preserving identity"
+            )
+            frame_entry = {
                 "scene_id": record["scene_id"],
-                "prompt_id": record["prompt_id"],
-                "positive_prompt": record["full_prompt"],
+                "prompt_id": frame_prompt_id,
+                "positive_prompt": frame_positive_prompt,
                 "negative_prompt": record["negative_prompt"],
                 "style": record["style"],
                 "aspect_ratio": record["aspect_ratio"],
             }
-        )
+            scene_generation_prompts.append(frame_entry)
+            frame_prompt_lookup[frame_prompt_id] = {
+                "scene_prompt_id": record["prompt_id"],
+                "frame_index": frame_index,
+                "frame_count": frame_count,
+                "record": record,
+                "frame_positive_prompt": frame_positive_prompt,
+            }
 
     prompt_manifest_path = project_dir / "assets" / "image-prompts.json"
     prompt_manifest_payload = {
@@ -451,6 +503,8 @@ def main() -> int:
             "transition_scene": profile["transition_scene"],
             "baseline_source": "assets/character-baseline.json",
             "prompt_count": len(scene_prompt_records),
+            "generated_frame_prompt_count": len(scene_generation_prompts),
+            "scene_frame_plan": scene_frame_plan,
         },
         "prompts": scene_prompt_records,
     }
@@ -473,29 +527,40 @@ def main() -> int:
     by_prompt_id, by_scene_id = build_generated_lookup(scene_result)
 
     images: list[dict[str, Any]] = []
-    for index, record in enumerate(scene_prompt_records, start=1):
-        scene_id = str(record["scene_id"])
-        prompt_id = str(record["prompt_id"])
-        generated = by_prompt_id.get(prompt_id) or by_scene_id.get(scene_id) or {}
+    for index, frame_prompt in enumerate(scene_generation_prompts, start=1):
+        scene_id = str(frame_prompt["scene_id"])
+        prompt_id = str(frame_prompt["prompt_id"])
+        lookup = frame_prompt_lookup.get(prompt_id, {})
+        record = lookup.get("record") if isinstance(lookup, dict) else {}
+        if not isinstance(record, dict):
+            continue
+        scene_prompt_id = str(lookup.get("scene_prompt_id", record.get("prompt_id", prompt_id)))
+        frame_index = int(lookup.get("frame_index", 1))
+        frame_count = int(lookup.get("frame_count", 1))
+        generated = by_prompt_id.get(prompt_id) or (
+            by_scene_id.get(scene_id) if frame_count == 1 else {}
+        )
         source_url = str(generated.get("url", "")).strip()
         request_id = str(generated.get("request_id", scene_result.get("request_id", "")))
+        output_stem = images_dir / scene_id / f"frame-{frame_index:02d}" if frame_count > 1 else images_dir / scene_id
 
         if scene_mode == "live":
             if not source_url.startswith(("http://", "https://")):
                 print(f"missing downloadable image url for {scene_id}", file=sys.stderr)
                 return 1
             try:
-                local_asset_path = download_image(source_url, images_dir / scene_id)
+                local_asset_path = download_image(source_url, output_stem)
             except Exception as exc:
                 print(f"failed to download image for {scene_id}: {exc}", file=sys.stderr)
                 return 1
         else:
-            local_asset_path = images_dir / f"{scene_id}.prompt.txt"
+            local_asset_path = output_stem.with_suffix(".prompt.txt")
+            local_asset_path.parent.mkdir(parents=True, exist_ok=True)
             local_asset_path.write_text(
                 "\n".join(
                     [
                         f"scene_id: {scene_id}",
-                        f"full_prompt: {record['full_prompt']}",
+                        f"full_prompt: {lookup.get('frame_positive_prompt', record['full_prompt'])}",
                         f"negative_prompt: {record['negative_prompt']}",
                     ]
                 )
@@ -507,9 +572,9 @@ def main() -> int:
         retry_count = 0
         if scene_mode == "live" and not consistency["passed"]:
             retry_count = 1
-            retry_prompt = dict(record)
-            retry_prompt["full_prompt"] = (
-                f"{record['full_prompt']}; strict identity lock: keep same face, same armor, same weapon silhouette"
+            retry_prompt = dict(frame_prompt)
+            retry_prompt["positive_prompt"] = (
+                f"{frame_prompt['positive_prompt']}; strict identity lock: keep same face, same armor, same weapon silhouette"
             )
             retry_result = generate_image(
                 config=config,
@@ -518,7 +583,7 @@ def main() -> int:
                     {
                         "scene_id": scene_id,
                         "prompt_id": prompt_id,
-                        "positive_prompt": retry_prompt["full_prompt"],
+                        "positive_prompt": retry_prompt["positive_prompt"],
                         "negative_prompt": retry_prompt["negative_prompt"],
                         "style": retry_prompt["style"],
                         "aspect_ratio": retry_prompt["aspect_ratio"],
@@ -553,10 +618,13 @@ def main() -> int:
                 "scene_id": scene_id,
                 "path": str(local_asset_path.relative_to(project_dir)),
                 "prompt_id": prompt_id,
+                "scene_prompt_id": scene_prompt_id,
+                "frame_index": frame_index,
+                "frame_count": frame_count,
                 "provider": "poe",
                 "model": image_model,
                 "request_id": request_id,
-                "full_prompt": record["full_prompt"],
+                "full_prompt": str(lookup.get("frame_positive_prompt", record["full_prompt"])),
                 "negative_prompt": record["negative_prompt"],
                 "character_state": record["character_state"],
                 "anchor_refs": record["anchor_refs"],
