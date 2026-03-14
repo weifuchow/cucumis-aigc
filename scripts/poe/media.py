@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import base64
 import http.client
 import hashlib
+import mimetypes
+import pathlib
 import re
 import time
 from typing import Any
@@ -150,6 +153,15 @@ def generate_audio(
     }
 
 
+def _encode_image_url(path: str) -> str | None:
+    p = pathlib.Path(path)
+    if not p.is_file():
+        return None
+    mime = mimetypes.guess_type(path)[0] or "image/jpeg"
+    data = base64.b64encode(p.read_bytes()).decode("utf-8")
+    return f"data:{mime};base64,{data}"
+
+
 def generate_video(
     config: PoeConfig,
     model: str,
@@ -177,35 +189,56 @@ def generate_video(
             "usage": {"cost_points": 0, "mode": "mock"},
         }
 
-    prompt = "\n".join(
-        f"{scene['scene_id']}: {scene['visual_description']} ({scene['duration_seconds']}s, {scene.get('motion_intent', 'mixed')})"
-        for scene in scenes
-    )
+    scene_lines: list[str] = []
+    for scene in scenes:
+        desc = scene.get("visual_description", scene.get("motion_intent", ""))
+        duration = scene["duration_seconds"]
+        motion = scene.get("motion_intent", "mixed")
+        scene_lines.append(f"{scene['scene_id']}: {desc} ({duration}s, {motion})")
+    prompt = "\n".join(scene_lines)
+    text_prompt = f"Resolution: 720p\nDuration: 5 seconds\nAudio: off\nAspect ratio {aspect_ratio}\n{prompt}"
+
+    # Build multipart content: start_frame → end_frame images → text prompt
+    # Per Poe docs: image_url with base64 data URL is the supported format
+    content: list[dict[str, Any]] = []
+    for scene in scenes:
+        for ref in scene.get("_ref_images", []):
+            data_url = _encode_image_url(str(ref.get("path", "")))
+            if data_url:
+                content.append({"type": "image_url", "image_url": {"url": data_url}})
+    content.append({"type": "text", "text": text_prompt})
+
     response = _request_json_with_retry(
         config,
         "/chat/completions",
         {
             "model": model,
             "stream": False,
-            "messages": [{"role": "user", "content": f"Aspect ratio {aspect_ratio}\n{prompt}"}],
+            "messages": [{"role": "user", "content": content}],
         },
     )
+    request_id = response.get("id", _stable_request_id("video", model, prompt))
+    choice = ((response.get("choices") or [{}])[0]).get("message", {})
+    content = _extract_text_content(choice.get("content"))
+    urls = _extract_http_urls(content)
+
     clips = []
-    for scene in scenes:
+    for i, scene in enumerate(scenes):
         clips.append(
             {
                 "scene_id": scene["scene_id"],
                 "duration_seconds": scene["duration_seconds"],
-                "url": f"poe://{response.get('id', 'video')}/{scene['scene_id']}",
+                "url": urls[i] if i < len(urls) else "",
                 "motion_intent": scene.get("motion_intent"),
+                "request_id": request_id,
             }
         )
     return {
         "mode": "live",
         "model": model,
-        "request_id": response.get("id", _stable_request_id("video", model, prompt)),
+        "request_id": request_id,
         "clips": clips,
-        "raw_response": {"id": response.get("id")},
+        "raw_response": {"id": response.get("id"), "content": content, "urls": urls},
         "usage": {
             "cost_points": ((response.get("usage") or {}).get("total_tokens")),
             "mode": "live",
