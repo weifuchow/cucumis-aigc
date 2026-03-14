@@ -83,6 +83,7 @@ description: Inspect workflow state choose next stage and write orchestration de
 
 ## Runtime Expectations
 
+- 若尚未存在项目目录，主控第一步应创建 `project_id` 并初始化项目目录（可通过 `scripts/init_project.py` 自动生成）
 - 主控必须优先读取 workflow 定义，而不是硬编码业务路径
 - 主控写出的状态与计划必须可被脚本和人工同时读取
 - 所有主控决策都应尽量落盘，而不是只存在于瞬时推理里

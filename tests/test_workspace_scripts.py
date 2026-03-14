@@ -1,5 +1,6 @@
 import json
 import pathlib
+import re
 import subprocess
 import tempfile
 import unittest
@@ -68,6 +69,34 @@ class WorkspaceScriptsTest(unittest.TestCase):
             self.assertTrue((project_dir / "costs").is_dir())
             self.assertTrue((project_dir / "assets").is_dir())
             self.assertTrue((project_dir / "outputs").is_dir())
+
+    def test_init_project_auto_generates_project_id_and_plan_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace_root = pathlib.Path(tmp)
+            projects_dir = workspace_root / "projects"
+            projects_dir.mkdir()
+
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(REPO_ROOT / "scripts" / "init_project.py"),
+                    "--projects-dir",
+                    str(projects_dir),
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            project_dir = pathlib.Path(result.stdout.strip())
+            self.assertTrue(project_dir.exists())
+            self.assertRegex(project_dir.name, r"^proj-\d{8}-\d{6}-[0-9a-f]{6}$")
+
+            plan = json.loads((project_dir / "orchestration" / "plan.json").read_text(encoding="utf-8"))
+            metadata = plan.get("metadata", {})
+            self.assertEqual(metadata.get("project_id"), project_dir.name)
+            self.assertIsInstance(metadata.get("created_at"), str)
+            self.assertTrue(re.match(r"^\d{4}-\d{2}-\d{2}T", metadata["created_at"]))
 
     def test_write_event_appends_json_line(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
