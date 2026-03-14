@@ -9,6 +9,10 @@
 第一版已可执行：当前输出稳定 `render-plan` 并执行基础校验；
 真实 ffmpeg 导出将在后续阶段继续增强。
 
+可选开启真实导出：
+
+- `python3 scripts/run_ffmpeg_renderer_reviewer.py --project <path> --enable-ffmpeg-export`
+
 ## Reads
 
 - `projects/<project>/timeline/timeline.json`

@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
+import shutil
+import subprocess
 import sys
 from typing import Any
 
@@ -12,6 +14,16 @@ from typing import Any
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build a deterministic render plan and run baseline checks.")
     parser.add_argument("--project", required=True, help="Project directory path.")
+    parser.add_argument(
+        "--enable-ffmpeg-export",
+        action="store_true",
+        help="Enable optional real ffmpeg export to outputs/final.mp4.",
+    )
+    parser.add_argument(
+        "--ffmpeg-binary",
+        default="ffmpeg",
+        help="ffmpeg binary path or command name.",
+    )
     return parser.parse_args()
 
 
@@ -35,6 +47,113 @@ def check_local_media_source(project_dir: pathlib.Path, source: str) -> bool:
     if source_path.is_absolute():
         return source_path.exists()
     return (project_dir / source_path).exists()
+
+
+def resolve_local_video_source(project_dir: pathlib.Path, tracks: list[dict[str, Any]]) -> pathlib.Path | None:
+    for track in tracks:
+        if not isinstance(track, dict) or track.get("track_id") != "video_main":
+            continue
+        items = track.get("items")
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            source = str(item.get("source", ""))
+            if not source or source.startswith(("mock://", "poe://", "http://", "https://")):
+                continue
+            source_path = pathlib.Path(source)
+            if not source_path.is_absolute():
+                source_path = project_dir / source_path
+            if source_path.exists():
+                return source_path
+    return None
+
+
+def run_ffmpeg_export(
+    *,
+    project_dir: pathlib.Path,
+    ffmpeg_binary: str,
+    duration_seconds: float,
+    local_video_source: pathlib.Path | None,
+) -> tuple[bool, dict[str, Any], list[str]]:
+    output_path = project_dir / "outputs" / "final.mp4"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    safe_duration = max(round(duration_seconds, 2), 1.0)
+    command: list[str]
+    mode: str
+    if local_video_source:
+        mode = "local_video"
+        command = [
+            ffmpeg_binary,
+            "-y",
+            "-stream_loop",
+            "-1",
+            "-i",
+            str(local_video_source),
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=channel_layout=stereo:sample_rate=48000",
+            "-t",
+            str(safe_duration),
+            "-shortest",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            str(output_path),
+        ]
+    else:
+        mode = "synthetic"
+        command = [
+            ffmpeg_binary,
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=black:s=720x1280:r=30",
+            "-f",
+            "lavfi",
+            "-i",
+            "anullsrc=channel_layout=stereo:sample_rate=48000",
+            "-t",
+            str(safe_duration),
+            "-shortest",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            str(output_path),
+        ]
+
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0:
+        return (
+            False,
+            {
+                "status": "failed",
+                "mode": mode,
+                "returncode": result.returncode,
+                "stderr": result.stderr[-2000:],
+                "output_path": str(output_path.relative_to(project_dir)),
+            },
+            command,
+        )
+    return (
+        True,
+        {
+            "status": "success",
+            "mode": mode,
+            "output_path": str(output_path.relative_to(project_dir)),
+            "file_size": output_path.stat().st_size if output_path.exists() else 0,
+        },
+        command,
+    )
 
 
 def main() -> int:
@@ -150,6 +269,35 @@ def main() -> int:
         ),
     )
 
+    ffmpeg_enabled = bool(args.enable_ffmpeg_export)
+    ffmpeg_execution: dict[str, Any] = {
+        "status": "skipped",
+        "reason": "ffmpeg export disabled",
+    }
+    ffmpeg_command_preview: list[str] = []
+    ffmpeg_binary_path = shutil.which(args.ffmpeg_binary) if ffmpeg_enabled else None
+    if ffmpeg_enabled:
+        if ffmpeg_binary_path is None:
+            failures.append(f"ffmpeg binary not found: {args.ffmpeg_binary}")
+            ffmpeg_execution = {
+                "status": "failed",
+                "reason": f"ffmpeg binary not found: {args.ffmpeg_binary}",
+            }
+        else:
+            local_source = resolve_local_video_source(project_dir, [track for track in tracks if isinstance(track, dict)])
+            export_ok, export_execution, command = run_ffmpeg_export(
+                project_dir=project_dir,
+                ffmpeg_binary=ffmpeg_binary_path,
+                duration_seconds=total_duration,
+                local_video_source=local_source,
+            )
+            ffmpeg_execution = export_execution
+            ffmpeg_command_preview = command
+            if not export_ok:
+                failures.append(
+                    f"ffmpeg export failed: {export_execution.get('stderr', 'unknown error')}"
+                )
+
     render_plan = {
         "version": "v1",
         "timeline_source": "timeline/timeline.json",
@@ -185,8 +333,8 @@ def main() -> int:
             for segment in sorted_segments
         ],
         "ffmpeg": {
-            "enabled": False,
-            "binary": "ffmpeg",
+            "enabled": ffmpeg_enabled,
+            "binary": ffmpeg_binary_path or args.ffmpeg_binary,
             "args_template": [
                 "-y",
                 "-i",
@@ -207,7 +355,9 @@ def main() -> int:
                 "aac",
                 "{output_path}",
             ],
-            "notes": "Placeholder only; real ffmpeg execution will be added in a later phase.",
+            "notes": "Optional real export. Falls back to synthetic source when local video media is unavailable.",
+            "execution": ffmpeg_execution,
+            "command_preview": ffmpeg_command_preview,
         },
         "output": {
             "path": "outputs/final.mp4",

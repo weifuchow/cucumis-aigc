@@ -135,6 +135,16 @@
         "notes": {
           "type": "string",
           "minLength": 1
+        },
+        "execution": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "command_preview": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

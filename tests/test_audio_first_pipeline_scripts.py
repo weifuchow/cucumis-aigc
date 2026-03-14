@@ -1,5 +1,6 @@
 import json
 import pathlib
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -9,12 +10,21 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 def run_script(script_name: str, project_dir: pathlib.Path) -> subprocess.CompletedProcess[str]:
+    return run_script_with_args(script_name, project_dir, [])
+
+
+def run_script_with_args(
+    script_name: str,
+    project_dir: pathlib.Path,
+    extra_args: list[str],
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
             "python3",
             str(REPO_ROOT / "scripts" / script_name),
             "--project",
             str(project_dir),
+            *extra_args,
         ],
         capture_output=True,
         text=True,
@@ -269,6 +279,31 @@ class AudioFirstPipelineScriptsTest(unittest.TestCase):
         result = run_script("run_ffmpeg_renderer_reviewer.py", self.project_dir)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("missing required tracks", result.stderr)
+
+    @unittest.skipUnless(shutil.which("ffmpeg"), "ffmpeg not installed")
+    def test_run_ffmpeg_renderer_reviewer_with_export_writes_final_mp4(self) -> None:
+        self.run_until_storyboard()
+        self.assertEqual(run_script("run_keyframe_planner.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_prompt_engineer.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_image_generator.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_constrained_video_generator.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_subtitle_asset_manager.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_timeline_builder.py", self.project_dir).returncode, 0)
+
+        result = run_script_with_args(
+            "run_ffmpeg_renderer_reviewer.py",
+            self.project_dir,
+            ["--enable-ffmpeg-export"],
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        output_video = self.project_dir / "outputs" / "final.mp4"
+        self.assertTrue(output_video.exists())
+        self.assertGreater(output_video.stat().st_size, 0)
+
+        render_plan = json.loads((self.project_dir / "outputs" / "render-plan.json").read_text(encoding="utf-8"))
+        self.assertTrue(render_plan["ffmpeg"]["enabled"])
+        self.assertEqual(render_plan["ffmpeg"]["execution"]["status"], "success")
 
     def test_full_pipeline_smoke_runs_all_12_stages(self) -> None:
         ordered_scripts = [
