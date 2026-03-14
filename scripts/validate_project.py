@@ -25,6 +25,8 @@ REQUIRED_FILES = [
     pathlib.Path("video/requests.json"),
     pathlib.Path("video/usage.json"),
     pathlib.Path("timeline/global-timeline.json"),
+    pathlib.Path("timeline/timeline.json"),
+    pathlib.Path("outputs/render-plan.json"),
     pathlib.Path("review/review-report.json"),
     pathlib.Path("review/observer-summary.md"),
     pathlib.Path("costs/poe-usage.jsonl"),
@@ -72,6 +74,9 @@ def main() -> int:
         project_dir / "video" / "clips.json",
         project_dir / "video" / "requests.json",
         project_dir / "video" / "usage.json",
+        project_dir / "timeline" / "global-timeline.json",
+        project_dir / "timeline" / "timeline.json",
+        project_dir / "outputs" / "render-plan.json",
         project_dir / "review" / "review-report.json",
     ]
     for input_path in json_paths:

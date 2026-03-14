@@ -1,0 +1,19 @@
+{
+  "version": "v1",
+  "timeline_source": "timeline/timeline.json",
+  "duration_seconds": 0,
+  "inputs": [],
+  "checks": [],
+  "stages": [],
+  "shot_plan": [],
+  "ffmpeg": {
+    "enabled": false,
+    "binary": "ffmpeg",
+    "args_template": [],
+    "notes": "placeholder"
+  },
+  "output": {
+    "path": "outputs/final.mp4",
+    "container": "mp4"
+  }
+}

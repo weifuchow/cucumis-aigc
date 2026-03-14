@@ -1,0 +1,13 @@
+{
+  "metadata": {
+    "global_timeline_source": "timeline/global-timeline.json",
+    "scene_count": 0,
+    "duration_seconds": 0
+  },
+  "tracks": [],
+  "segments": [],
+  "output": {
+    "format": "mp4",
+    "aspect_ratio": "9:16"
+  }
+}

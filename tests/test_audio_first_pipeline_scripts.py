@@ -159,6 +159,66 @@ class AudioFirstPipelineScriptsTest(unittest.TestCase):
         self.assertEqual(usage["model"], "veo-3.1-fast")
         self.assertIn(json.loads(cost_lines[-1])["skill"], {"audio_foundation", "constrained_video_generator"})
 
+    def test_run_timeline_builder_writes_timeline_artifact(self) -> None:
+        self.assertEqual(run_script("run_input_parser.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_script_writer.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_audio_foundation.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_global_timeline_initializer.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_beat_sync_storyboard_planner.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_constrained_video_generator.py", self.project_dir).returncode, 0)
+
+        result = run_script("run_timeline_builder.py", self.project_dir)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        payload = json.loads((self.project_dir / "timeline" / "timeline.json").read_text(encoding="utf-8"))
+        self.assertIn("metadata", payload)
+        self.assertIn("tracks", payload)
+        self.assertIn("segments", payload)
+        self.assertIn("output", payload)
+        self.assertTrue(payload["segments"])
+
+    def test_run_ffmpeg_renderer_reviewer_writes_render_plan(self) -> None:
+        self.assertEqual(run_script("run_input_parser.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_script_writer.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_audio_foundation.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_global_timeline_initializer.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_beat_sync_storyboard_planner.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_constrained_video_generator.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_timeline_builder.py", self.project_dir).returncode, 0)
+
+        result = run_script("run_ffmpeg_renderer_reviewer.py", self.project_dir)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        first_plan_text = (self.project_dir / "outputs" / "render-plan.json").read_text(encoding="utf-8")
+
+        second_result = run_script("run_ffmpeg_renderer_reviewer.py", self.project_dir)
+        self.assertEqual(second_result.returncode, 0, second_result.stderr)
+        second_plan_text = (self.project_dir / "outputs" / "render-plan.json").read_text(encoding="utf-8")
+        self.assertEqual(first_plan_text, second_plan_text)
+
+        payload = json.loads(first_plan_text)
+        self.assertEqual(payload["version"], "v1")
+        self.assertIn("checks", payload)
+        self.assertIn("ffmpeg", payload)
+        self.assertGreater(payload["duration_seconds"], 0)
+
+    def test_run_ffmpeg_renderer_reviewer_rejects_missing_required_tracks(self) -> None:
+        self.assertEqual(run_script("run_input_parser.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_script_writer.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_audio_foundation.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_global_timeline_initializer.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_beat_sync_storyboard_planner.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_constrained_video_generator.py", self.project_dir).returncode, 0)
+        self.assertEqual(run_script("run_timeline_builder.py", self.project_dir).returncode, 0)
+
+        timeline_path = self.project_dir / "timeline" / "timeline.json"
+        timeline_payload = json.loads(timeline_path.read_text(encoding="utf-8"))
+        timeline_payload["tracks"] = []
+        timeline_path.write_text(json.dumps(timeline_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+        result = run_script("run_ffmpeg_renderer_reviewer.py", self.project_dir)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("missing required tracks", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

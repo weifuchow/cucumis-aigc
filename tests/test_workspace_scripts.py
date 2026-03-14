@@ -44,12 +44,14 @@ class WorkspaceScriptsTest(unittest.TestCase):
             self.assertTrue((project_dir / "audio" / "tts-response.json").exists())
             self.assertTrue((project_dir / "audio" / "usage.json").exists())
             self.assertTrue((project_dir / "timeline" / "global-timeline.json").exists())
+            self.assertTrue((project_dir / "timeline" / "timeline.json").exists())
             self.assertTrue((project_dir / "review" / "review-report.json").exists())
             self.assertTrue((project_dir / "review" / "observer-summary.md").exists())
             self.assertTrue((project_dir / "video" / "clips.json").exists())
             self.assertTrue((project_dir / "video" / "requests.json").exists())
             self.assertTrue((project_dir / "video" / "usage.json").exists())
             self.assertTrue((project_dir / "costs" / "poe-usage.jsonl").exists())
+            self.assertTrue((project_dir / "outputs" / "render-plan.json").exists())
             self.assertTrue((project_dir / "script").is_dir())
             self.assertTrue((project_dir / "storyboard").is_dir())
             self.assertTrue((project_dir / "timeline").is_dir())
@@ -131,6 +133,10 @@ class WorkspaceScriptsTest(unittest.TestCase):
             (project_dir / "video" / "usage.json").write_text("{}", encoding="utf-8")
             (project_dir / "timeline").mkdir()
             (project_dir / "timeline" / "global-timeline.json").write_text("{}", encoding="utf-8")
+            (project_dir / "timeline" / "timeline.json").write_text(
+                '{"metadata": {}, "tracks": [], "segments": [], "output": {"format": "mp4", "aspect_ratio": "9:16"}}',
+                encoding="utf-8",
+            )
             (project_dir / "review").mkdir()
             (project_dir / "review" / "review-report.json").write_text("{}", encoding="utf-8")
             (project_dir / "review" / "observer-summary.md").write_text("# Demo\n", encoding="utf-8")
@@ -138,6 +144,7 @@ class WorkspaceScriptsTest(unittest.TestCase):
             (project_dir / "costs" / "poe-usage.jsonl").write_text("", encoding="utf-8")
             (project_dir / "assets").mkdir()
             (project_dir / "outputs").mkdir()
+            (project_dir / "outputs" / "render-plan.json").write_text("{}", encoding="utf-8")
 
             result = subprocess.run(
                 [
