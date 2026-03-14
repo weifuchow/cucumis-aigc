@@ -20,6 +20,8 @@ ARTIFACT_LINES = [
     ("keyframes/keyframes.json", "Keyframes"),
     ("prompts/prompts.json", "Prompts"),
     ("assets/manifest.json", "Asset manifest"),
+    ("assets/image-requests.json", "Image requests"),
+    ("assets/image-usage.json", "Image usage"),
     ("subtitles/subtitles.json", "Subtitles"),
     ("video/clips.json", "Video clips"),
     ("timeline/timeline.json", "Timeline"),

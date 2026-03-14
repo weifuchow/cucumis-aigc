@@ -101,6 +101,7 @@ class AudioFirstPipelineScriptsTest(unittest.TestCase):
 
         payload = json.loads((self.project_dir / "input" / "input.json").read_text(encoding="utf-8"))
         self.assertEqual(payload["audio_model"], "elevenlabs-v3")
+        self.assertEqual(payload["image_model"], "flux-schnell")
         self.assertEqual(payload["video_model"], "veo-3.1-fast")
 
     def test_run_script_writer_adds_emotion_markers_and_turning_points(self) -> None:
@@ -217,8 +218,15 @@ class AudioFirstPipelineScriptsTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
         payload = json.loads((self.project_dir / "assets" / "manifest.json").read_text(encoding="utf-8"))
+        requests_payload = json.loads((self.project_dir / "assets" / "image-requests.json").read_text(encoding="utf-8"))
+        usage_payload = json.loads((self.project_dir / "assets" / "image-usage.json").read_text(encoding="utf-8"))
+        cost_lines = (self.project_dir / "costs" / "poe-usage.jsonl").read_text(encoding="utf-8").splitlines()
         self.assertIn("images", payload)
         self.assertTrue(payload["images"])
+        self.assertEqual(requests_payload["provider"], "poe")
+        self.assertEqual(requests_payload["model"], "flux-schnell")
+        self.assertEqual(usage_payload["model"], "flux-schnell")
+        self.assertIn(json.loads(cost_lines[-1])["skill"], {"audio_foundation", "image_generator"})
 
     def test_run_subtitle_asset_manager_writes_subtitles_and_manifest(self) -> None:
         self.run_until_storyboard()

@@ -48,6 +48,8 @@ def main() -> int:
             "keyframes_exists": (project_dir / "keyframes" / "keyframes.json").is_file(),
             "prompts_exists": (project_dir / "prompts" / "prompts.json").is_file(),
             "asset_manifest_exists": (project_dir / "assets" / "manifest.json").is_file(),
+            "image_requests_exists": (project_dir / "assets" / "image-requests.json").is_file(),
+            "image_usage_exists": (project_dir / "assets" / "image-usage.json").is_file(),
             "subtitles_exists": (project_dir / "subtitles" / "subtitles.json").is_file(),
             "clips_exists": (project_dir / "video" / "clips.json").is_file(),
             "timeline_exists": (project_dir / "timeline" / "timeline.json").is_file(),

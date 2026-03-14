@@ -30,6 +30,8 @@ REQUIRED_FILES = [
     pathlib.Path("timeline/global-timeline.json"),
     pathlib.Path("timeline/timeline.json"),
     pathlib.Path("assets/manifest.json"),
+    pathlib.Path("assets/image-requests.json"),
+    pathlib.Path("assets/image-usage.json"),
     pathlib.Path("outputs/render-plan.json"),
     pathlib.Path("review/review-report.json"),
     pathlib.Path("review/observer-summary.md"),
@@ -87,6 +89,8 @@ def main() -> int:
         project_dir / "timeline" / "global-timeline.json",
         project_dir / "timeline" / "timeline.json",
         project_dir / "assets" / "manifest.json",
+        project_dir / "assets" / "image-requests.json",
+        project_dir / "assets" / "image-usage.json",
         project_dir / "outputs" / "render-plan.json",
         project_dir / "review" / "review-report.json",
     ]

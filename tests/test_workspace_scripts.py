@@ -49,6 +49,8 @@ class WorkspaceScriptsTest(unittest.TestCase):
             self.assertTrue((project_dir / "prompts" / "prompts.json").exists())
             self.assertTrue((project_dir / "subtitles" / "subtitles.json").exists())
             self.assertTrue((project_dir / "assets" / "manifest.json").exists())
+            self.assertTrue((project_dir / "assets" / "image-requests.json").exists())
+            self.assertTrue((project_dir / "assets" / "image-usage.json").exists())
             self.assertTrue((project_dir / "review" / "review-report.json").exists())
             self.assertTrue((project_dir / "review" / "observer-summary.md").exists())
             self.assertTrue((project_dir / "video" / "clips.json").exists())
@@ -160,6 +162,8 @@ class WorkspaceScriptsTest(unittest.TestCase):
                 '{"images": [], "subtitles": [], "audio": [], "videos": []}',
                 encoding="utf-8",
             )
+            (project_dir / "assets" / "image-requests.json").write_text("{}", encoding="utf-8")
+            (project_dir / "assets" / "image-usage.json").write_text("{}", encoding="utf-8")
             (project_dir / "outputs").mkdir()
             (project_dir / "outputs" / "render-plan.json").write_text("{}", encoding="utf-8")
 

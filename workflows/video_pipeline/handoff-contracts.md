@@ -134,7 +134,10 @@
 
 **Writes**
 - `assets/manifest.json`
-- `assets/images/*` placeholder prompt assets in first version
+- `assets/images/*` prompt trace assets
+- `assets/image-requests.json`
+- `assets/image-usage.json`
+- `costs/poe-usage.jsonl` append line
 
 **Emits**
 - `workflow.stage.started`

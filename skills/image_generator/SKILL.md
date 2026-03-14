@@ -1,6 +1,6 @@
 ---
 name: image-generator
-description: Generate mock image asset records from prompts and update asset manifest. Use when visual reference assets are needed.
+description: Generate image assets through Poe model calls (with local mock fallback) and update manifest/usage artifacts.
 ---
 
 # image_generator
@@ -11,17 +11,20 @@ description: Generate mock image asset records from prompts and update asset man
 
 ## Status
 
-第一版已可执行，生成调试用 mock 图像提示资产并写入素材清单。
+第一版已可执行，接入 Poe 图片模型并保留本地 mock fallback，可生成素材索引与调用元数据。
 
 ## Planned Reads
 
-- `projects/<project>/storyboard/storyboard.json`
-- `projects/<project>/keyframes/keyframes.json`
+- `projects/<project>/prompts/prompts.json`
+- `projects/<project>/input/input.json`
 
 ## Planned Writes
 
 - `projects/<project>/assets/images/`
 - `projects/<project>/assets/manifest.json`
+- `projects/<project>/assets/image-requests.json`
+- `projects/<project>/assets/image-usage.json`
+- `projects/<project>/costs/poe-usage.jsonl`
 
 ## Runtime Expectations
 

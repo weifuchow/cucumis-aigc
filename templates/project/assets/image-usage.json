@@ -1,0 +1,7 @@
+{
+  "provider": "poe",
+  "mode": "mock",
+  "model": "flux-schnell",
+  "request_id": "",
+  "cost_points": 0
+}

@@ -156,3 +156,75 @@ def generate_video(
             "mode": "live",
         },
     }
+
+
+def generate_image(
+    config: PoeConfig,
+    model: str,
+    prompts: list[dict[str, Any]],
+) -> dict[str, Any]:
+    if not config.api_key:
+        images = []
+        for prompt in prompts:
+            scene_id = str(prompt.get("scene_id", "scene"))
+            images.append(
+                {
+                    "scene_id": scene_id,
+                    "prompt_id": str(prompt.get("prompt_id", "")),
+                    "url": f"mock://image/{scene_id}.png",
+                    "style": prompt.get("style"),
+                    "aspect_ratio": prompt.get("aspect_ratio"),
+                }
+            )
+        return {
+            "mode": "mock",
+            "model": model,
+            "request_id": _stable_request_id("image", model, str(prompts)),
+            "images": images,
+            "raw_response": {"provider": "poe", "mode": "mock"},
+            "usage": {"cost_points": 0, "mode": "mock"},
+        }
+
+    prompt = "\n".join(
+        (
+            f"{item.get('scene_id', 'scene')}: "
+            f"{item.get('positive_prompt', '')} | "
+            f"negative: {item.get('negative_prompt', '')} | "
+            f"style: {item.get('style', '')} | "
+            f"aspect: {item.get('aspect_ratio', '')}"
+        )
+        for item in prompts
+    )
+    response = request_json(
+        config,
+        "POST",
+        "/chat/completions",
+        payload={
+            "model": model,
+            "stream": False,
+            "messages": [{"role": "user", "content": f"Generate image assets for:\n{prompt}"}],
+        },
+    )
+    images = []
+    for item in prompts:
+        scene_id = str(item.get("scene_id", "scene"))
+        images.append(
+            {
+                "scene_id": scene_id,
+                "prompt_id": str(item.get("prompt_id", "")),
+                "url": f"poe://{response.get('id', 'image')}/{scene_id}.png",
+                "style": item.get("style"),
+                "aspect_ratio": item.get("aspect_ratio"),
+            }
+        )
+    return {
+        "mode": "live",
+        "model": model,
+        "request_id": response.get("id", _stable_request_id("image", model, prompt)),
+        "images": images,
+        "raw_response": {"id": response.get("id")},
+        "usage": {
+            "cost_points": ((response.get("usage") or {}).get("total_tokens")),
+            "mode": "live",
+        },
+    }

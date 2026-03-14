@@ -13,6 +13,7 @@
     "music_emotion",
     "pacing_preference",
     "audio_model",
+    "image_model",
     "video_model",
     "requires_voiceover",
     "requires_subtitles"
@@ -36,7 +37,12 @@
     },
     "aspect_ratio": {
       "type": "string",
-      "enum": ["16:9", "9:16", "1:1", "4:3"]
+      "enum": [
+        "16:9",
+        "9:16",
+        "1:1",
+        "4:3"
+      ]
     },
     "style": {
       "type": "string",
@@ -63,6 +69,10 @@
     },
     "requires_subtitles": {
       "type": "boolean"
+    },
+    "image_model": {
+      "type": "string",
+      "minLength": 1
     }
   }
 }

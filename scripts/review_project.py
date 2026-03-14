@@ -32,7 +32,11 @@ STAGE_ARTIFACTS = {
     "beat_sync_storyboard_planner": [pathlib.Path("storyboard/storyboard.json")],
     "keyframe_planner": [pathlib.Path("keyframes/keyframes.json")],
     "prompt_engineer": [pathlib.Path("prompts/prompts.json")],
-    "image_generator": [pathlib.Path("assets/manifest.json")],
+    "image_generator": [
+        pathlib.Path("assets/manifest.json"),
+        pathlib.Path("assets/image-requests.json"),
+        pathlib.Path("assets/image-usage.json"),
+    ],
     "constrained_video_generator": [
         pathlib.Path("video/clips.json"),
         pathlib.Path("video/requests.json"),

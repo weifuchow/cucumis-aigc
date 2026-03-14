@@ -10,8 +10,8 @@ from poe.client import load_poe_config
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="List current Poe audio/video models.")
-    parser.add_argument("--category", choices=["all", "audio", "video"], default="all")
+    parser = argparse.ArgumentParser(description="List current Poe audio/image/video models.")
+    parser.add_argument("--category", choices=["all", "audio", "image", "video"], default="all")
     return parser.parse_args()
 
 

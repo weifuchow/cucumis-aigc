@@ -8,7 +8,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from poe.catalog import classify_media_models, format_price_display
 from poe.client import PoeConfig, load_poe_config
-from poe.media import generate_audio, generate_video
+from poe.media import generate_audio, generate_image, generate_video
 
 
 class PoeSdkTest(unittest.TestCase):
@@ -43,10 +43,18 @@ class PoeSdkTest(unittest.TestCase):
                 "output_modalities": ["audio"],
                 "pricing": None,
             },
+            {
+                "id": "flux-schnell",
+                "owned_by": "BlackForestLabs",
+                "input_modalities": ["text"],
+                "output_modalities": ["image"],
+                "pricing": None,
+            },
         ]
 
         catalog = classify_media_models(models)
         self.assertEqual(catalog["audio"][0]["id"], "elevenlabs-v3")
+        self.assertEqual(catalog["image"][0]["id"], "flux-schnell")
         self.assertEqual(catalog["video"][0]["id"], "kling-2.1-pro")
         self.assertEqual(catalog["audio"][1]["price_display"], "Request price: 0.0040")
 
@@ -88,6 +96,26 @@ class PoeSdkTest(unittest.TestCase):
         self.assertEqual(result["mode"], "mock")
         self.assertEqual(result["model"], "veo-3.1-fast")
         self.assertEqual(result["clips"][0]["scene_id"], "scene-1")
+
+    def test_generate_image_without_api_key_returns_mock_assets(self) -> None:
+        config = PoeConfig(api_key="", base_url="https://api.poe.com/v1")
+        result = generate_image(
+            config=config,
+            model="flux-schnell",
+            prompts=[
+                {
+                    "scene_id": "scene-1",
+                    "prompt_id": "prompt-1",
+                    "positive_prompt": "cinematic skyline",
+                    "negative_prompt": "blurry",
+                    "style": "cinematic realism",
+                    "aspect_ratio": "9:16",
+                }
+            ],
+        )
+        self.assertEqual(result["mode"], "mock")
+        self.assertEqual(result["model"], "flux-schnell")
+        self.assertEqual(result["images"][0]["scene_id"], "scene-1")
 
 
 if __name__ == "__main__":

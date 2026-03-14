@@ -48,6 +48,8 @@ projects/<project-name>/
     poe-usage.jsonl
   assets/
     manifest.json
+    image-requests.json
+    image-usage.json
     images/
   outputs/
     render-plan.json
@@ -63,6 +65,7 @@ projects/<project-name>/
 - `video/` 保存逐镜头视频生成请求、产物和成本信息
 - `keyframes/` 保存每个 scene 的关键视觉锚点
 - `prompts/` 保存模型可执行提示词
+- `assets/image-requests.json` 和 `assets/image-usage.json` 保存图片阶段 Poe 调用摘要与成本信息
 - `subtitles/` 保存结构化字幕条目
 - `timeline/global-timeline.json` 保存音频驱动的全局时间网格
 - `assets/manifest.json` 聚合图片、字幕、音频、视频资产索引
