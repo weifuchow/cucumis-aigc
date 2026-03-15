@@ -32,6 +32,13 @@ def parse_args() -> argparse.Namespace:
         default=2,
         help="Maximum number of video model API calls. Excess scenes are rendered locally.",
     )
+    parser.add_argument(
+        "--scenes",
+        default="",
+        help="Comma-separated scene IDs to force through the video model API. "
+             "All other scenes reuse existing clips from clips.json (if available) "
+             "or fall back to local FFmpeg render. Example: --scenes scene-7,scene-8",
+    )
     return parser.parse_args()
 
 
@@ -400,12 +407,16 @@ def should_use_local_image_clip(scene: dict[str, Any], scene_images: list[dict[s
     if not scene_images:
         return False
     asset_mode = str(scene.get("asset_mode", "")).lower()
+    # asset_mode is the explicit storyboard decision — take precedence over motion_intent
+    if asset_mode == "mixed":
+        return False  # explicitly requires video model
+    if asset_mode == "static":
+        return True  # explicitly local render regardless of motion_intent
+    # fallback for unset asset_mode: use motion_intent heuristic
     motion_intent = str(scene.get("motion_intent", "")).lower()
     expensive_motion = {"fast_push", "black_flash", "whip_pan", "handheld"}
     if motion_intent in expensive_motion:
         return False
-    if asset_mode == "mixed":
-        return len(scene_images) >= 3
     if should_use_static_clip(scene):
         return True
     return len(scene_images) >= 2
@@ -490,6 +501,24 @@ def main() -> int:
     dynamic_scenes: list[dict[str, Any]] = []
     prev_scene_id: str | None = None
 
+    # --scenes: only these scene IDs are sent to the video model API.
+    # All other scenes reuse existing clips from clips.json (when valid) or fall back to local render.
+    force_api_scenes: set[str] = {s.strip() for s in args.scenes.split(",") if s.strip()} if args.scenes else set()
+
+    # Load existing clips to reuse for scenes not in force_api_scenes.
+    existing_clips: dict[str, dict[str, Any]] = {}
+    existing_clips_path = project_dir / "video" / "clips.json"
+    if existing_clips_path.is_file():
+        try:
+            existing_data = json.loads(existing_clips_path.read_text(encoding="utf-8"))
+            for clip in existing_data.get("clips", []):
+                if isinstance(clip, dict):
+                    sid = clip.get("scene_id")
+                    if isinstance(sid, str) and sid:
+                        existing_clips[sid] = clip
+        except (json.JSONDecodeError, OSError):
+            pass
+
     for scene in scenes:
         if not isinstance(scene, dict):
             continue
@@ -500,6 +529,17 @@ def main() -> int:
         scene_assets = scene_images.get(scene_id, [])
         image_paths = [str(item.get("path", "")) for item in scene_assets if isinstance(item.get("path"), str)]
         technique = str(scene.get("local_render_technique", "")).lower()
+
+        # Reuse existing clip when --scenes is specified and this scene is not in the forced list.
+        if force_api_scenes and scene_id not in force_api_scenes and scene_id in existing_clips:
+            existing_clip = existing_clips[scene_id]
+            existing_url = str(existing_clip.get("url", ""))
+            if existing_url:
+                local_static_clips[scene_id] = existing_clip
+                print(f"[video] {scene_id}: reusing existing clip ({existing_url[:60]})", flush=True)
+                prev_scene_id = scene_id
+                continue
+
         if should_use_local_image_clip(scene, scene_assets) and ffmpeg_available and image_paths:
             if not technique:
                 technique = _default_technique(str(scene.get("motion_intent", "")).lower(), len(image_paths))
@@ -542,6 +582,7 @@ def main() -> int:
     if len(dynamic_scenes) > max_video_calls:
         priority_motion = {"fast_push", "whip_pan", "handheld", "black_flash"}
         dynamic_scenes.sort(key=lambda s: (
+            0 if str(s.get("asset_mode", "")).lower() == "mixed" else 1,
             0 if str(s.get("motion_intent", "")).lower() in priority_motion else 1,
             -as_float(s.get("duration_seconds"), 2.0),
         ))
@@ -585,7 +626,8 @@ def main() -> int:
     video_result: dict[str, Any]
     if dynamic_scenes:
         # Prefer project-local Poe config (projects/<project>/.env) to support per-project keys.
-        config = load_poe_config(env_path=project_dir / ".env")
+        project_env = project_dir / ".env"
+        config = load_poe_config(env_path=project_env if project_env.is_file() else None)
         video_result = generate_video(
             config=config,
             model=str(task_input["video_model"]),

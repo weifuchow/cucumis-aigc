@@ -270,12 +270,21 @@ def main() -> int:
     project_dir = pathlib.Path(args.project).resolve()
     script = json.loads((project_dir / "script" / "script.json").read_text(encoding="utf-8"))
     task_input = json.loads((project_dir / "input" / "input.json").read_text(encoding="utf-8"))
-    # Prefer project-local Poe config (projects/<project>/.env) to support per-project keys.
-    config = load_poe_config(env_path=project_dir / ".env")
+    # Prefer project-local Poe config; fall back to repo-root .env.
+    project_env = project_dir / ".env"
+    config = load_poe_config(env_path=project_env if project_env.is_file() else None)
     audio_dir = project_dir / "audio"
     audio_dir.mkdir(parents=True, exist_ok=True)
 
-    script_lines = [str(item).strip() for item in script.get("audio_track", []) if str(item).strip()]
+    raw_track = script.get("audio_track", [])
+    script_lines = []
+    for item in raw_track:
+        if isinstance(item, dict):
+            text = str(item.get("text", "")).strip()
+        else:
+            text = str(item).strip()
+        if text:
+            script_lines.append(text)
     if not script_lines:
         raise ValueError("script/audio_track must be a non-empty list")
 

@@ -6,6 +6,7 @@ import hashlib
 import mimetypes
 import pathlib
 import re
+import socket
 import time
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -61,11 +62,12 @@ def _request_json_with_retry(
     *,
     max_attempts: int = 3,
     sleep_seconds: float = 2.0,
+    timeout: int = 120,
 ) -> dict[str, Any]:
     last_error: Exception | None = None
     for attempt in range(1, max_attempts + 1):
         try:
-            return request_json(config, "POST", path, payload=payload)
+            return request_json(config, "POST", path, payload=payload, timeout=timeout)
         except Exception as exc:  # pragma: no cover - network/provider edge
             last_error = exc
             is_transient = isinstance(
@@ -74,12 +76,14 @@ def _request_json_with_retry(
                     URLError,
                     http.client.RemoteDisconnected,
                     TimeoutError,
+                    socket.timeout,
                 ),
             )
             if isinstance(exc, HTTPError):
                 is_transient = 500 <= exc.code < 600
             if not is_transient or attempt >= max_attempts:
                 raise
+            print(f"[poe] transient error (attempt {attempt}/{max_attempts}): {exc}, retrying in {sleep_seconds * attempt:.0f}s", flush=True)
             time.sleep(sleep_seconds * attempt)
     assert last_error is not None
     raise last_error
@@ -198,30 +202,34 @@ def generate_video(
     prompt = "\n".join(scene_lines)
     text_prompt = f"Aspect ratio {aspect_ratio}\n{prompt}"
 
-    # Build multipart content: start_frame → end_frame images → text prompt
-    # Per Poe docs: image_url with base64 data URL is the supported format
-    content: list[dict[str, Any]] = []
+    # Build multipart content: reference images → text prompt
+    # Per Poe docs: image_url with base64 data URL is the supported format.
+    # Poe enforces a hard cap of 2 image attachments per request.
+    MAX_IMAGES = 2
+    image_parts: list[dict[str, Any]] = []
     for scene in scenes:
         for ref in scene.get("_ref_images", []):
+            if len(image_parts) >= MAX_IMAGES:
+                break
             data_url = _encode_image_url(str(ref.get("path", "")))
             if data_url:
-                content.append({"type": "image_url", "image_url": {"url": data_url}})
-    content.append({"type": "text", "text": text_prompt})
+                image_parts.append({"type": "image_url", "image_url": {"url": data_url}})
+        if len(image_parts) >= MAX_IMAGES:
+            break
+    content: list[dict[str, Any]] = image_parts + [{"type": "text", "text": text_prompt}]
 
-    response = _request_json_with_retry(
-        config,
-        "/chat/completions",
-        {
-            "model": model,
-            "stream": False,
-            "messages": [{"role": "user", "content": content}],
-            "extra_body": {
-                "resolution": "720p",
-                "duration": 5,
-                "audio": False,
-            },
-        },
-    )
+    # Pixverse models accept resolution/duration/audio via extra_body;
+    # other video models (veo, kling, runway, sora) do not support these fields.
+    is_pixverse = "pixverse" in model.lower()
+    payload: dict[str, Any] = {
+        "model": model,
+        "stream": False,
+        "messages": [{"role": "user", "content": content}],
+    }
+    if is_pixverse:
+        payload["extra_body"] = {"resolution": "720p", "duration": 5, "audio": False}
+
+    response = _request_json_with_retry(config, "/chat/completions", payload, timeout=600)
     request_id = response.get("id", _stable_request_id("video", model, prompt))
     choice = ((response.get("choices") or [{}])[0]).get("message", {})
     content = _extract_text_content(choice.get("content"))
@@ -286,26 +294,28 @@ def generate_image(
     for item in prompts:
         scene_id = str(item.get("scene_id", "scene"))
         prompt_id = str(item.get("prompt_id", ""))
-        prompt = (
-            f"{scene_id}: "
-            f"{item.get('positive_prompt', '')} | "
-            f"negative: {item.get('negative_prompt', '')} | "
-            f"style: {item.get('style', '')} | "
-            f"aspect: {item.get('aspect_ratio', '')}"
-        )
+        positive_prompt = item.get("positive_prompt", "")
+        negative_prompt = item.get("negative_prompt", "")
+        aspect_ratio = item.get("aspect_ratio", "9:16")
+
+        extra_body: dict[str, Any] = {"aspect_ratio": aspect_ratio}
+        if negative_prompt:
+            extra_body["negative_prompt"] = negative_prompt
+
         response = _request_json_with_retry(
             config,
             "/chat/completions",
             {
                 "model": model,
                 "stream": False,
-                "messages": [{"role": "user", "content": f"Generate one image asset for:\n{prompt}"}],
+                "messages": [{"role": "user", "content": positive_prompt}],
+                "extra_body": extra_body,
             },
         )
         choice = ((response.get("choices") or [{}])[0]).get("message", {})
         content = _extract_text_content(choice.get("content"))
         urls = _extract_http_urls(content)
-        request_id = str(response.get("id", _stable_request_id("image", model, prompt)))
+        request_id = str(response.get("id", _stable_request_id("image", model, positive_prompt)))
         request_ids.append(request_id)
         usage = response.get("usage") or {}
         if isinstance(usage, dict):

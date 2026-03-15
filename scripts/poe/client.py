@@ -46,6 +46,7 @@ def request_json(
     path: str,
     payload: dict[str, Any] | None = None,
     extra_headers: dict[str, str] | None = None,
+    timeout: int = 120,
 ) -> dict[str, Any]:
     url = f"{config.base_url.rstrip('/')}/{path.lstrip('/')}"
     body = None if payload is None else json.dumps(payload).encode("utf-8")
@@ -59,5 +60,10 @@ def request_json(
         headers.update(extra_headers)
 
     request = urllib.request.Request(url, data=body, headers=headers, method=method.upper())
-    with urllib.request.urlopen(request, timeout=120) as response:
-        return json.loads(response.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8", errors="replace")
+        print(f"[poe] HTTP {e.code} from {url}: {error_body[:500]}", flush=True)
+        raise

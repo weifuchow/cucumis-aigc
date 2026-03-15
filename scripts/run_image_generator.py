@@ -30,6 +30,12 @@ def parse_args() -> argparse.Namespace:
         default=50000,
         help="Minimum image file size threshold used for lightweight consistency checks.",
     )
+    parser.add_argument(
+        "--max-scenes",
+        type=int,
+        default=0,
+        help="Debug mode: limit generation to first N scenes (0 = no limit).",
+    )
     return parser.parse_args()
 
 
@@ -166,6 +172,18 @@ def load_storyboard_scene_map(path: pathlib.Path) -> dict[str, dict[str, Any]]:
     return scene_map
 
 
+def load_consistency_profile_override(project_dir: pathlib.Path) -> dict[str, Any] | None:
+    """Load project-level consistency_profile.json if present (overrides hardcoded inference)."""
+    path = project_dir / "assets" / "consistency_profile.json"
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        return payload if isinstance(payload, dict) else None
+    except json.JSONDecodeError:
+        return None
+
+
 def infer_subject(task_input: dict[str, Any], script_payload: dict[str, Any]) -> str:
     title = str(script_payload.get("title", ""))
     topic = str(task_input.get("topic", ""))
@@ -200,12 +218,30 @@ def build_consistency_profile(
     task_input: dict[str, Any],
     script_payload: dict[str, Any],
     prompts: list[dict[str, Any]],
+    override: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    # If project provides a consistency_profile.json, use it directly.
+    if override:
+        consistency_type = str(override.get("consistency_type", "human"))
+        profile = dict(override)
+        profile.setdefault("consistency_type", consistency_type)
+        profile.setdefault("transition_scene", len(prompts))
+        # Normalise to the keys the rest of the script expects.
+        if consistency_type == "mascot":
+            profile.setdefault("hero_state", "mascot_v1")
+            profile.setdefault("dragon_state", "mascot_v1")
+        else:
+            profile.setdefault("hero_state", "hero_v1")
+            profile.setdefault("dragon_state", "dragonized_v2")
+        return profile
+
+    # Fallback: original inference logic for human-protagonist projects.
     subject = infer_subject(task_input, script_payload)
     transition_scene = infer_transition_scene(prompts, script_payload)
     style = str(task_input.get("style", "cinematic realism"))
     aspect_ratio = str(task_input.get("aspect_ratio", "9:16"))
     return {
+        "consistency_type": "human",
         "subject": subject,
         "character_id": f"{subject}-v1",
         "hero_state": "hero_v1",
@@ -219,10 +255,17 @@ def build_consistency_profile(
         ],
         "style_lock": f"style:{style}; aspect:{aspect_ratio}; high detail cinematic frame",
         "negative_lock": "different character identity, random costume swap, inconsistent face, extra limbs",
+        "retry_lock": "strict identity lock: keep same face, same armor, same weapon silhouette",
     }
 
 
 def build_anchor_prompt_specs(profile: dict[str, Any]) -> list[dict[str, Any]]:
+    # Use project-level anchor spec when provided (mascot / non-human projects).
+    anchor_override = profile.get("anchor")
+    if isinstance(anchor_override, dict):
+        return [anchor_override]
+
+    # Fallback: classic human character emotion sheet.
     subject = str(profile["subject"])
     style_lock = str(profile["style_lock"])
     traits = ", ".join(profile["immutable_traits"])
@@ -293,12 +336,16 @@ def build_scene_prompt_record(
     style = str(prompt.get("style", "cinematic realism"))
     aspect_ratio = str(prompt.get("aspect_ratio", default_aspect_ratio))
     character_state = infer_scene_state(scene_index, profile)
-    anchor_list = ", ".join(anchor_ids)
-    full_prompt = (
-        f"{profile['style_lock']}; subject:{profile['subject']}; character_state:{character_state}; "
-        f"anchor_refs:{anchor_list}; reference_anchor:nine_grid_character_sheet; scene_instruction:{source_positive}; "
-        f"continuity_rules:{', '.join(profile['immutable_traits'])}"
-    )
+
+    # Build a clean, image-model-friendly prompt:
+    # 1. Scene description first (most important)
+    # 2. Visual consistency traits appended in natural language (no label:value metadata)
+    traits_str = ", ".join(profile.get("immutable_traits", []))
+    if traits_str:
+        full_prompt = f"{source_positive}; {traits_str}"
+    else:
+        full_prompt = source_positive
+
     final_negative = f"{source_negative}, {profile['negative_lock']}"
     return {
         "scene_id": scene_id,
@@ -347,7 +394,8 @@ def main() -> int:
         return 1
 
     script_payload = load_script_optional(project_dir / "script" / "script.json")
-    profile = build_consistency_profile(task_input, script_payload, prompts)
+    consistency_override = load_consistency_profile_override(project_dir)
+    profile = build_consistency_profile(task_input, script_payload, prompts, override=consistency_override)
     default_aspect_ratio = str(task_input.get("aspect_ratio", "9:16"))
     image_model = str(task_input.get("image_model", "flux-schnell"))
 
@@ -359,8 +407,9 @@ def main() -> int:
     baseline_path = project_dir / "assets" / "character-baseline.json"
     baselines = [] if args.refresh_baseline else load_cached_baselines(baseline_path, project_dir)
 
-    # Prefer project-local Poe config (projects/<project>/.env) to support per-project keys.
-    config = load_poe_config(env_path=project_dir / ".env")
+    # Prefer project-local Poe config; fall back to repo-root .env.
+    project_env = project_dir / ".env"
+    config = load_poe_config(env_path=project_env if project_env.is_file() else None)
 
     all_request_ids: list[str] = []
     total_cost_points = 0
@@ -459,7 +508,8 @@ def main() -> int:
     scene_generation_prompts: list[dict[str, Any]] = []
     frame_prompt_lookup: dict[str, dict[str, Any]] = {}
     scene_frame_plan: dict[str, int] = {}
-    for index, prompt in enumerate(prompts, start=1):
+    active_prompts = prompts if not args.max_scenes else prompts[: args.max_scenes]
+    for index, prompt in enumerate(active_prompts, start=1):
         record = build_scene_prompt_record(
             prompt=prompt,
             profile=profile,
@@ -573,8 +623,9 @@ def main() -> int:
         if scene_mode == "live" and not consistency["passed"]:
             retry_count = 1
             retry_prompt = dict(frame_prompt)
+            retry_lock = str(profile.get("retry_lock", "strict identity lock: keep same face, same armor, same weapon silhouette"))
             retry_prompt["positive_prompt"] = (
-                f"{frame_prompt['positive_prompt']}; strict identity lock: keep same face, same armor, same weapon silhouette"
+                f"{frame_prompt['positive_prompt']}; {retry_lock}"
             )
             retry_result = generate_image(
                 config=config,

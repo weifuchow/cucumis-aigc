@@ -80,6 +80,35 @@ description: Inspect workflow state choose next stage and write orchestration de
 - 为什么从某个阶段恢复
 - 为什么判定可以进入下一阶段
 
+## Project Resolution（启动时必须优先执行）
+
+**若用户未指定 project ID，必须先做以下判断，再进入任何 workflow 逻辑：**
+
+### Step 1：扫描现有项目
+
+列出 `projects/` 目录下所有子目录，展示给用户：
+
+```
+当前已有项目：
+  1. dragon-fall-35s
+  2. my-other-project
+  ...
+  N. 新建项目
+
+请输入项目编号，或直接输入新项目的标题：
+```
+
+### Step 2：用户选择
+
+- **选已有项目** → 进入 **Resume 模式**：读取已有产物与编排状态，从断点继续执行
+- **选新建 / 输入标题** → 进入 **New 模式**：根据标题生成 project_id（slug 格式），调用 `scripts/init_project.py` 初始化目录，从 `creative_design` 阶段开始
+
+### Step 3：确认后再推进
+
+确认模式与项目后，输出一行提示说明当前模式，然后继续正常 orchestration 流程。
+
+---
+
 ## Runtime Expectations
 
 - 若尚未存在项目目录，主控第一步应创建 `project_id` 并初始化项目目录（可通过 `scripts/init_project.py` 自动生成）
