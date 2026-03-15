@@ -32,8 +32,8 @@ FIELD_DEFAULTS: dict[str, object] = {
 }
 
 
-def build_input(intake: dict[str, object]) -> dict[str, object]:
-    """Map brief/intake.json fields to pipeline input.json, adding model defaults."""
+def build_input(intake: dict[str, object], concept: dict[str, object] | None) -> dict[str, object]:
+    """Map brief/intake.json + selected concept to pipeline input.json."""
     result: dict[str, object] = {}
 
     # Copy all content fields from intake
@@ -43,6 +43,21 @@ def build_input(intake: dict[str, object]) -> dict[str, object]:
                 "content_structure", "visual_preferences", "constraints"):
         if key in intake:
             result[key] = intake[key]
+
+    # Overlay selected concept fields (concept wins over intake defaults)
+    if concept:
+        if concept.get("music_direction"):
+            result["music_emotion"] = concept["music_direction"]
+        if concept.get("visual_direction"):
+            result["visual_direction"] = concept["visual_direction"]
+        if concept.get("emotional_arc"):
+            result["emotional_arc"] = concept["emotional_arc"]
+        if concept.get("angle"):
+            result["creative_angle"] = concept["angle"]
+        if concept.get("opening_line"):
+            result["opening_line"] = concept["opening_line"]
+        result["selected_concept_id"] = concept.get("concept_id", "")
+        result["selected_concept_title"] = concept.get("title", "")
 
     # Apply field defaults for missing required fields
     for key, default in FIELD_DEFAULTS.items():
@@ -60,10 +75,12 @@ def main() -> int:
     args = parse_args()
     project_dir = pathlib.Path(args.project).resolve()
     intake_path = project_dir / "brief" / "intake.json"
+    concept_path = project_dir / "brief" / "selected-concept.json"
     output_path = project_dir / "input" / "input.json"
 
     intake = json.loads(intake_path.read_text(encoding="utf-8"))
-    payload = build_input(intake)
+    concept = json.loads(concept_path.read_text(encoding="utf-8")) if concept_path.exists() else None
+    payload = build_input(intake, concept)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

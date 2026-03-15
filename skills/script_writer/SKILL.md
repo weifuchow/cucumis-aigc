@@ -14,6 +14,7 @@ description: Generate emotion tagged script content from structured input artifa
 ## Reads
 
 - `projects/<project>/input/input.json`
+- `projects/<project>/brief/selected-concept.json`（必读：用户确认的创意方向）
 - `projects/<project>/brief/creative-brief.md`（可选，获取更完整的创意上下文）
 
 ## Writes
@@ -64,6 +65,18 @@ description: Generate emotion tagged script content from structured input artifa
 - `insight_reveal`：核心洞察揭示
 - `emotional_peak`：情绪爆发点
 - `call_to_action`：行动号召
+
+## 与 selected-concept.json 的对接
+
+`selected-concept.json` 中的字段直接约束脚本内容：
+
+| 字段 | 对脚本的影响 |
+|---|---|
+| `opening_line` | **第一条 audio_track 必须以此开头**，可以轻微调整措辞但不能改变方向 |
+| `emotional_arc` | 整体情绪走向，决定台词语气如何变化 |
+| `angle` | 叙事切入点，决定论证逻辑和举例方向 |
+| `visual_direction` | 影响 visual_track 的构图和色调描述 |
+| `music_direction` | 校验 input.json 中的 `music_emotion` 是否一致 |
 
 ## 决策框架：如何从 input.json 推导脚本
 

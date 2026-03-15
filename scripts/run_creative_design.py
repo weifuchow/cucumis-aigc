@@ -40,11 +40,21 @@ def main() -> int:
     scripts_dir = pathlib.Path(__file__).resolve().parent
 
     intake_script = scripts_dir / "run_creative_brief_intake.py"
+    proposal_script = scripts_dir / "run_creative_proposal.py"
     input_script = scripts_dir / "run_input_parser.py"
 
     intake_code = run_step(intake_script, project_dir, seed_text=args.seed_text)
     if intake_code != 0:
         return intake_code
+
+    # In Claude-driven mode, creative_proposal runs interactively before this script
+    # is called and already wrote selected-concept.json. Only run the script fallback
+    # if the user selection has not been recorded yet (batch/auto mode).
+    selected_path = project_dir / "brief" / "selected-concept.json"
+    if not selected_path.exists():
+        proposal_code = run_step(proposal_script, project_dir)
+        if proposal_code != 0:
+            return proposal_code
 
     parse_code = run_step(input_script, project_dir)
     if parse_code != 0:
