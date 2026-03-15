@@ -67,10 +67,16 @@ description: Guide users from a one-line idea to a complete creative brief throu
 - 受众 / 平台 / 旁白要求 / 字幕要求
 - 内容结构 / 视觉偏好 / 约束
 
-## Script Fallback
+## 两种执行模式
 
-当无法进行完整多轮对话（批处理或自动化场景）时，使用脚本：
+### Claude 驱动（推荐）
+
+Claude 直接与用户多轮对话，按上述流程引导，最终写入 `brief/creative-brief.md` 和 `brief/intake.json`。这是本 skill 的设计意图——脚本无法替代真实的需求澄清对话。
+
+### 脚本模式（自动化 fallback）
+
+当无法进行完整多轮对话（批处理或已有结构化输入）时：
 
 `python3 scripts/run_creative_brief_intake.py --project <project-path>`
 
-脚本会用默认值补齐缺失字段，并生成标准 brief 文件。
+脚本做字段解析 + 默认值填充，**不会引导用户补充信息**。适合已有完整 `request.md` 的情况。

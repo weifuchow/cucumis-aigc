@@ -1,49 +1,48 @@
 ---
 name: input-parser
-description: Parse raw project request text into structured input configuration fields. Use at workflow start before script generation.
+description: Map brief/intake.json to structured pipeline input.json with model defaults. Use after creative_brief_intake and before script generation.
 ---
 
 # input_parser
 
 ## Purpose
 
-将原始任务请求转换成标准化输入配置，作为整条听觉驱动视频生产链的统一起点。
+将 `brief/intake.json`（创意引导产物）映射为流水线统一输入格式 `input/input.json`，并补充模型配置默认值。
 
-默认主链已将本阶段并入 `creative_design`，本 skill 仍保留用于单独调试或局部重跑。
+**不再重复解析 `request.md`**——创意引导阶段已完成解析，本阶段只做字段映射 + 模型配置注入。
 
 ## Reads
 
-- `projects/<project>/request.md`
-- 操作者补充的结构化参数，如时长、语言、画幅或风格要求
+- `projects/<project>/brief/intake.json`（由 `creative_brief_intake` 生成）
 
 ## Writes
 
 - `projects/<project>/input/input.json`
 
-## Required Output
+## 字段映射
 
-`input.json` 至少应包含：
+| intake.json 字段 | input.json 字段 | 备注 |
+|---|---|---|
+| topic, goal, duration_seconds 等 | 直接复制 | 创意字段透传 |
+| 缺失的 style/music_emotion/pacing_preference | 补默认值 | 专业克制 / 平稳推进 / 均匀 |
+| audio_model / image_model / video_model | 注入默认值 | 可被 intake 覆盖 |
 
-- `topic`
-- `goal`
-- `duration_seconds`
-- `language`
-- `aspect_ratio`
-- `style`
-- `music_emotion`
-- `pacing_preference`
-- `requires_voiceover`
-- `requires_subtitles`
+## 模型配置默认值
+
+```json
+{
+  "audio_model": "elevenlabs-v3",
+  "image_model": "flux-schnell",
+  "video_model": "veo-3.1-fast",
+  "requires_voiceover": true,
+  "requires_subtitles": true
+}
+```
+
+如需使用不同模型，在 `brief/intake.json` 中显式指定，或 Claude 执行后直接修改 `input/input.json`。
 
 ## Runtime Expectations
 
-- 解析前写 `workflow.stage.started`
-- 写入产物后写 `artifact.written`
-- 完成时写 `workflow.stage.completed`
-- 如果输入不完整，必须显式指出缺失字段，而不是静默猜测
-
-## Failure Behavior
-
-- 无法确定关键字段时中止阶段
-- 写 `workflow.stage.failed`
-- 保留原始 `request.md`
+- 调用 `python scripts/run_input_parser.py --project <name>`
+- 依赖 `brief/intake.json` 存在，必须在 `creative_brief_intake` 之后执行
+- 如果缺少必要字段，明确报告而不是静默猜测
