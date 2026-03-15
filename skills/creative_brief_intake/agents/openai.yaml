@@ -1,4 +1,0 @@
-interface:
-  display_name: "Creative Brief Intake"
-  short_description: "Guide multi-turn intake and output a complete creative brief"
-  default_prompt: "Guide the user through multi-turn clarification and write a standard Creative Brief to request.md."
