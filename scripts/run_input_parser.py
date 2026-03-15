@@ -15,8 +15,10 @@ def parse_args() -> argparse.Namespace:
 
 MODEL_DEFAULTS: dict[str, object] = {
     "audio_model": "elevenlabs-v3",
-    "image_model": "flux-schnell",
-    "video_model": "veo-3.1-fast",
+    "image_model": "grok-imagine-image",
+    "video_model": "pixverse-v5.6",
+    "max_video_calls": 2,
+    "cost_tier": "standard",
     "requires_voiceover": True,
     "requires_subtitles": True,
 }

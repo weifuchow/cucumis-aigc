@@ -537,7 +537,8 @@ def main() -> int:
         prev_scene_id = scene_id
 
     # Budget enforcement: cap video model calls, force overflow scenes to local render
-    max_video_calls = args.max_video_calls
+    # input.json cost_tier takes precedence over CLI --max-video-calls
+    max_video_calls = int(task_input.get("max_video_calls", args.max_video_calls))
     if len(dynamic_scenes) > max_video_calls:
         priority_motion = {"fast_push", "whip_pan", "handheld", "black_flash"}
         dynamic_scenes.sort(key=lambda s: (
