@@ -163,6 +163,81 @@ def resolve_video_clips(project_dir: pathlib.Path, tracks: list[dict[str, Any]])
 
 
 FFMPEG_FULL = "/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg"
+LOGO_ENDFRAME = pathlib.Path(__file__).parent.parent / "templates" / "brand" / "logo-endframe.jpg"
+ENDFRAME_TOTAL_DUR = 3.0   # seconds: black + fade + logo hold
+ENDFRAME_FADE_DUR = 0.8    # seconds: crossfade duration
+ENDFRAME_BLACK_DUR = 1.2   # seconds: pure black before fade starts
+
+
+def append_endframe(output_path: pathlib.Path, ffmpeg_binary: str) -> bool:
+    """Append a black → fade-in logo end sequence to an existing video file."""
+    if not LOGO_ENDFRAME.exists():
+        print(f"[endframe] logo not found at {LOGO_ENDFRAME}, skipping", flush=True)
+        return False
+
+    tmp_end = output_path.with_stem(output_path.stem + "_endclip")
+    tmp_final = output_path.with_stem(output_path.stem + "_withend")
+
+    # Step 1: Build end clip (black screen cross-fades into logo)
+    end_cmd = [
+        ffmpeg_binary, "-y",
+        "-loop", "1", "-t", str(ENDFRAME_TOTAL_DUR), "-i", str(LOGO_ENDFRAME),
+        "-filter_complex", (
+            f"[0:v]scale=720:1280:force_original_aspect_ratio=decrease,"
+            f"pad=720:1280:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p[logo];"
+            f"color=c=black:s=720x1280:r=30,fps=30,format=yuv420p,"
+            f"trim=duration={ENDFRAME_TOTAL_DUR}[blk];"
+            f"[blk][logo]xfade=transition=fade:duration={ENDFRAME_FADE_DUR}:"
+            f"offset={ENDFRAME_BLACK_DUR}[vend]"
+        ),
+        "-map", "[vend]",
+        "-t", str(ENDFRAME_TOTAL_DUR),
+        "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        str(tmp_end),
+    ]
+    r = subprocess.run(end_cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        print(f"[endframe] failed to build end clip: {r.stderr[-500:]}", flush=True)
+        return False
+
+    # Detect whether main video has an audio stream
+    probe = subprocess.run([ffmpeg_binary, "-i", str(output_path)], capture_output=True, text=True)
+    has_audio = "Audio:" in probe.stderr
+
+    # Step 2: Concat main video + end clip
+    if has_audio:
+        concat_filter = (
+            f"[0:v][1:v]concat=n=2:v=1:a=0[vout];"
+            f"[0:a]apad=pad_dur={ENDFRAME_TOTAL_DUR}[aout]"
+        )
+        concat_cmd = [
+            ffmpeg_binary, "-y",
+            "-i", str(output_path),
+            "-i", str(tmp_end),
+            "-filter_complex", concat_filter,
+            "-map", "[vout]", "-map", "[aout]",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
+            str(tmp_final),
+        ]
+    else:
+        concat_cmd = [
+            ffmpeg_binary, "-y",
+            "-i", str(output_path),
+            "-i", str(tmp_end),
+            "-filter_complex", "[0:v][1:v]concat=n=2:v=1:a=0[vout]",
+            "-map", "[vout]", "-an",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            str(tmp_final),
+        ]
+
+    r = subprocess.run(concat_cmd, capture_output=True, text=True)
+    tmp_end.unlink(missing_ok=True)
+    if r.returncode != 0:
+        print(f"[endframe] failed to concat end frame: {r.stderr[-500:]}", flush=True)
+        return False
+
+    tmp_final.replace(output_path)
+    return True
 
 
 def find_voiceover(project_dir: pathlib.Path) -> pathlib.Path | None:
@@ -263,14 +338,20 @@ def run_ffmpeg_export(
         else:
             print(f"[subtitle] burn failed, keeping video without subtitles: {sub_result.stderr[-500:]}", flush=True)
 
+    # Pass 3: append black → fade-in logo end frame
+    endframe_appended = append_endframe(output_path, ffmpeg_binary)
+    if not endframe_appended:
+        print("[endframe] skipped or failed, video has no end frame", flush=True)
+
     return (
         True,
         {
             "status": "success",
-            "mode": mode + ("_subtitled" if sub_burned else ""),
+            "mode": mode + ("_subtitled" if sub_burned else "") + ("_endframe" if endframe_appended else ""),
             "clips_count": len(clips),
             "voiceover": str(voiceover.relative_to(project_dir)) if voiceover else None,
             "subtitles": str(ass_path.relative_to(project_dir)) if sub_burned and ass_path else None,
+            "endframe": str(LOGO_ENDFRAME) if endframe_appended else None,
             "output_path": str(output_path.relative_to(project_dir)),
             "file_size_bytes": output_path.stat().st_size if output_path.exists() else 0,
         },
