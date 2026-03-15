@@ -196,7 +196,7 @@ def generate_video(
         motion = scene.get("motion_intent", "mixed")
         scene_lines.append(f"{scene['scene_id']}: {desc} ({duration}s, {motion})")
     prompt = "\n".join(scene_lines)
-    text_prompt = f"Resolution: 720p\nDuration: 5 seconds\nAudio: off\nAspect ratio {aspect_ratio}\n{prompt}"
+    text_prompt = f"Aspect ratio {aspect_ratio}\n{prompt}"
 
     # Build multipart content: start_frame → end_frame images → text prompt
     # Per Poe docs: image_url with base64 data URL is the supported format
@@ -215,6 +215,11 @@ def generate_video(
             "model": model,
             "stream": False,
             "messages": [{"role": "user", "content": content}],
+            "extra_body": {
+                "resolution": "720p",
+                "duration": 5,
+                "audio": False,
+            },
         },
     )
     request_id = response.get("id", _stable_request_id("video", model, prompt))
