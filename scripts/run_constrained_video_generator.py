@@ -26,6 +26,12 @@ def parse_args() -> argparse.Namespace:
         default="ffmpeg",
         help="ffmpeg binary path or command name for local static clip generation.",
     )
+    parser.add_argument(
+        "--max-video-calls",
+        type=int,
+        default=2,
+        help="Maximum number of video model API calls. Excess scenes are rendered locally.",
+    )
     return parser.parse_args()
 
 
@@ -198,6 +204,198 @@ def render_image_sequence_clip(
     return True, str(output_path.relative_to(project_dir))
 
 
+def render_alternating_clip(
+    *,
+    ffmpeg_binary: str,
+    project_dir: pathlib.Path,
+    scene_id: str,
+    image_paths: list[str],
+    duration_seconds: float,
+    frame_hold_seconds: float = 0.15,
+) -> tuple[bool, str]:
+    """Rapid frame alternation for action scenes (running, fighting, etc.)."""
+    resolved_paths: list[pathlib.Path] = []
+    for image_path in image_paths[:2]:
+        p = pathlib.Path(image_path) if pathlib.Path(image_path).is_absolute() else project_dir / image_path
+        if not p.is_file():
+            return False, f"image not found: {image_path}"
+        resolved_paths.append(p)
+    if len(resolved_paths) < 2:
+        return False, "alternating requires at least 2 images"
+
+    safe_duration = max(round(duration_seconds, 2), 0.8)
+    output_path = project_dir / "video" / "static" / f"{scene_id}.mp4"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.NamedTemporaryFile("w", suffix=".ffconcat", delete=False, encoding="utf-8") as handle:
+        concat_path = pathlib.Path(handle.name)
+        handle.write("ffconcat version 1.0\n")
+        elapsed, i = 0.0, 0
+        while elapsed < safe_duration:
+            img = resolved_paths[i % len(resolved_paths)]
+            hold = min(frame_hold_seconds, safe_duration - elapsed)
+            escaped = str(img).replace("'", "'\\''")
+            handle.write(f"file '{escaped}'\nduration {hold:.3f}\n")
+            elapsed += frame_hold_seconds
+            i += 1
+        last = resolved_paths[(i - 1) % len(resolved_paths)]
+        handle.write(f"file '{str(last).replace(chr(39), chr(39) + chr(92) + chr(39) + chr(39))}'\n")
+
+    command = [
+        ffmpeg_binary, "-y",
+        "-f", "concat", "-safe", "0", "-i", str(concat_path),
+        "-vf", "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p",
+        "-t", str(safe_duration), "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        str(output_path),
+    ]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True)
+    finally:
+        concat_path.unlink(missing_ok=True)
+    if result.returncode != 0 or not output_path.is_file():
+        return False, (result.stderr or "alternating render failed").strip()[-500:]
+    return True, str(output_path.relative_to(project_dir))
+
+
+def render_crossfade_clip(
+    *,
+    ffmpeg_binary: str,
+    project_dir: pathlib.Path,
+    scene_id: str,
+    image_paths: list[str],
+    duration_seconds: float,
+    fade_duration: float = 0.5,
+) -> tuple[bool, str]:
+    """Smooth crossfade between two images for slow transitions."""
+    resolved_paths: list[pathlib.Path] = []
+    for image_path in image_paths[:2]:
+        p = pathlib.Path(image_path) if pathlib.Path(image_path).is_absolute() else project_dir / image_path
+        if not p.is_file():
+            return False, f"image not found: {image_path}"
+        resolved_paths.append(p)
+    if len(resolved_paths) < 2:
+        return False, "crossfade requires at least 2 images"
+
+    safe_duration = max(round(duration_seconds, 2), 1.0)
+    per_seg = round(safe_duration / 2, 3)
+    fade_dur = min(fade_duration, per_seg * 0.4)
+    output_path = project_dir / "video" / "static" / f"{scene_id}.mp4"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    scale_vf = "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p"
+    filter_complex = (
+        f"[0:v]{scale_vf}[v0];[1:v]{scale_vf}[v1];"
+        f"[v0][v1]xfade=transition=fade:duration={fade_dur:.3f}:offset={per_seg - fade_dur:.3f}[vout]"
+    )
+    command = [
+        ffmpeg_binary, "-y",
+        "-loop", "1", "-t", str(per_seg), "-i", str(resolved_paths[0]),
+        "-loop", "1", "-t", str(per_seg), "-i", str(resolved_paths[1]),
+        "-filter_complex", filter_complex,
+        "-map", "[vout]", "-t", str(safe_duration),
+        "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        str(output_path),
+    ]
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0 or not output_path.is_file():
+        return False, (result.stderr or "crossfade render failed").strip()[-500:]
+    return True, str(output_path.relative_to(project_dir))
+
+
+def render_zoom_pan_clip(
+    *,
+    ffmpeg_binary: str,
+    project_dir: pathlib.Path,
+    scene_id: str,
+    image_path: str,
+    duration_seconds: float,
+    direction: str = "zoom_in",
+) -> tuple[bool, str]:
+    """Ken Burns zoom/pan effect on a single image."""
+    source_path = pathlib.Path(image_path) if pathlib.Path(image_path).is_absolute() else project_dir / image_path
+    if not source_path.is_file():
+        return False, f"image not found: {image_path}"
+
+    safe_duration = max(round(duration_seconds, 2), 0.8)
+    total_frames = int(safe_duration * 30)
+    output_path = project_dir / "video" / "static" / f"{scene_id}.mp4"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    zoompan_exprs: dict[str, str] = {
+        "zoom_in":   f"zoompan=z='min(zoom+0.0015,1.5)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={total_frames}:s=720x1280:fps=30",
+        "zoom_out":  f"zoompan=z='if(lte(zoom,1.0),1.5,max(zoom-0.0015,1.0))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={total_frames}:s=720x1280:fps=30",
+        "pan_left":  f"zoompan=z=1.2:x='min(x+1,iw*(1-1/zoom))':y='ih/2-(ih/zoom/2)':d={total_frames}:s=720x1280:fps=30",
+        "pan_right": f"zoompan=z=1.2:x='max(x-1,0)':y='ih/2-(ih/zoom/2)':d={total_frames}:s=720x1280:fps=30",
+    }
+    zp = zoompan_exprs.get(direction, zoompan_exprs["zoom_in"])
+    command = [
+        ffmpeg_binary, "-y",
+        "-loop", "1", "-i", str(source_path),
+        "-vf", f"scale=1440:2560,{zp},format=yuv420p",
+        "-t", str(safe_duration), "-r", "30",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        str(output_path),
+    ]
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0 or not output_path.is_file():
+        return False, (result.stderr or "zoom_pan render failed").strip()[-500:]
+    return True, str(output_path.relative_to(project_dir))
+
+
+def _render_by_technique(
+    *,
+    technique: str,
+    ffmpeg_binary: str,
+    project_dir: pathlib.Path,
+    scene_id: str,
+    image_paths: list[str],
+    duration_seconds: float,
+) -> tuple[bool, str, str]:
+    """Dispatch to the right local renderer. Returns (ok, path_or_error, source_mode)."""
+    if technique == "alternating" and len(image_paths) >= 2:
+        ok, result = render_alternating_clip(
+            ffmpeg_binary=ffmpeg_binary, project_dir=project_dir,
+            scene_id=scene_id, image_paths=image_paths, duration_seconds=duration_seconds,
+        )
+        return ok, result, "alternating_ffmpeg"
+    if technique == "crossfade" and len(image_paths) >= 2:
+        ok, result = render_crossfade_clip(
+            ffmpeg_binary=ffmpeg_binary, project_dir=project_dir,
+            scene_id=scene_id, image_paths=image_paths, duration_seconds=duration_seconds,
+        )
+        return ok, result, "crossfade_ffmpeg"
+    if technique in ("zoom_in", "zoom_out", "pan_left", "pan_right", "zoom_pan") and image_paths:
+        direction = technique if technique != "zoom_pan" else "zoom_in"
+        ok, result = render_zoom_pan_clip(
+            ffmpeg_binary=ffmpeg_binary, project_dir=project_dir,
+            scene_id=scene_id, image_path=image_paths[0], duration_seconds=duration_seconds,
+            direction=direction,
+        )
+        return ok, result, f"{direction}_ffmpeg"
+    if len(image_paths) == 1:
+        ok, result = render_static_clip(
+            ffmpeg_binary=ffmpeg_binary, project_dir=project_dir,
+            image_path=image_paths[0], scene_id=scene_id, duration_seconds=duration_seconds,
+        )
+        return ok, result, "static_ffmpeg"
+    ok, result = render_image_sequence_clip(
+        ffmpeg_binary=ffmpeg_binary, project_dir=project_dir,
+        scene_id=scene_id, image_paths=image_paths, duration_seconds=duration_seconds,
+    )
+    return ok, result, "image_sequence_ffmpeg"
+
+
+def _default_technique(motion_intent: str, image_count: int) -> str:
+    """Pick best local render technique when storyboard doesn't specify one."""
+    if motion_intent in {"fast_push", "whip_pan", "handheld"} and image_count >= 2:
+        return "alternating"
+    if motion_intent == "slow_pan" and image_count >= 1:
+        return "zoom_in"
+    if motion_intent == "locked" and image_count >= 2:
+        return "crossfade"
+    return "sequence" if image_count > 1 else "loop"
+
+
 def should_use_local_image_clip(scene: dict[str, Any], scene_images: list[dict[str, Any]]) -> bool:
     if not scene_images:
         return False
@@ -301,47 +499,34 @@ def main() -> int:
         duration = as_float(scene.get("duration_seconds"), 2.0)
         scene_assets = scene_images.get(scene_id, [])
         image_paths = [str(item.get("path", "")) for item in scene_assets if isinstance(item.get("path"), str)]
+        technique = str(scene.get("local_render_technique", "")).lower()
         if should_use_local_image_clip(scene, scene_assets) and ffmpeg_available and image_paths:
-            if len(image_paths) == 1:
-                ok, output_or_error = render_static_clip(
-                    ffmpeg_binary=args.ffmpeg_binary,
-                    project_dir=project_dir,
-                    image_path=image_paths[0],
-                    scene_id=scene_id,
-                    duration_seconds=duration,
-                )
-                source_mode = "static_ffmpeg"
-            else:
-                ok, output_or_error = render_image_sequence_clip(
-                    ffmpeg_binary=args.ffmpeg_binary,
-                    project_dir=project_dir,
-                    scene_id=scene_id,
-                    image_paths=image_paths,
-                    duration_seconds=duration,
-                )
-                source_mode = "image_sequence_ffmpeg"
+            if not technique:
+                technique = _default_technique(str(scene.get("motion_intent", "")).lower(), len(image_paths))
+            ok, output_or_error, source_mode = _render_by_technique(
+                technique=technique,
+                ffmpeg_binary=args.ffmpeg_binary,
+                project_dir=project_dir,
+                scene_id=scene_id,
+                image_paths=image_paths,
+                duration_seconds=duration,
+            )
             if ok:
-                per_frame_dur = max(0.35, duration / max(1, len(image_paths))) if len(image_paths) > 1 else duration
                 local_static_clips[scene_id] = {
                     "scene_id": scene_id,
                     "duration_seconds": duration,
                     "url": output_or_error,
                     "motion_intent": scene.get("motion_intent", "hold"),
+                    "local_render_technique": technique,
                     "source_mode": source_mode,
                     "planning": {
                         "source_images": image_paths,
                         "frame_count": len(image_paths),
-                        "ffmpeg_params": {
-                            "per_frame_duration_seconds": round(per_frame_dur, 3),
-                            "resolution": "720x1280",
-                            "fps": 30,
-                            "codec": "libx264",
-                        },
+                        "ffmpeg_params": {"resolution": "720x1280", "fps": 30, "codec": "libx264"},
                     },
                 }
             else:
                 static_clip_errors.append(f"{scene_id}: {output_or_error}")
-                # Attach reference images before adding to dynamic_scenes
                 scene = dict(scene)
                 scene["_ref_images"] = _build_ref_image_paths(scene_id, prev_scene_id, scene_images, project_dir)
                 dynamic_scenes.append(scene)
@@ -350,6 +535,51 @@ def main() -> int:
             scene["_ref_images"] = _build_ref_image_paths(scene_id, prev_scene_id, scene_images, project_dir)
             dynamic_scenes.append(scene)
         prev_scene_id = scene_id
+
+    # Budget enforcement: cap video model calls, force overflow scenes to local render
+    max_video_calls = args.max_video_calls
+    if len(dynamic_scenes) > max_video_calls:
+        priority_motion = {"fast_push", "whip_pan", "handheld", "black_flash"}
+        dynamic_scenes.sort(key=lambda s: (
+            0 if str(s.get("motion_intent", "")).lower() in priority_motion else 1,
+            -as_float(s.get("duration_seconds"), 2.0),
+        ))
+        over_budget = dynamic_scenes[max_video_calls:]
+        dynamic_scenes = dynamic_scenes[:max_video_calls]
+        print(f"[video] budget cap={max_video_calls}: forcing {len(over_budget)} scene(s) to local render", flush=True)
+        for scene in over_budget:
+            scene_id = str(scene.get("scene_id", ""))
+            scene_assets_list = scene_images.get(scene_id, [])
+            image_paths_list = [str(item.get("path", "")) for item in scene_assets_list if isinstance(item.get("path"), str)]
+            duration = as_float(scene.get("duration_seconds"), 2.0)
+            motion_intent = str(scene.get("motion_intent", "")).lower()
+            technique = str(scene.get("local_render_technique", "")).lower() or _default_technique(motion_intent, len(image_paths_list))
+            if not image_paths_list or not ffmpeg_available:
+                print(f"[video] {scene_id}: no images for forced-local render, keeping in dynamic", flush=True)
+                dynamic_scenes.append(scene)
+                continue
+            ok, output_or_error, source_mode = _render_by_technique(
+                technique=technique,
+                ffmpeg_binary=args.ffmpeg_binary,
+                project_dir=project_dir,
+                scene_id=scene_id,
+                image_paths=image_paths_list,
+                duration_seconds=duration,
+            )
+            if ok:
+                local_static_clips[scene_id] = {
+                    "scene_id": scene_id,
+                    "duration_seconds": duration,
+                    "url": output_or_error,
+                    "motion_intent": motion_intent,
+                    "local_render_technique": technique,
+                    "source_mode": source_mode + "_budget_forced",
+                    "planning": {"source_images": image_paths_list, "frame_count": len(image_paths_list)},
+                }
+                print(f"[video] {scene_id}: budget-forced → {source_mode} ({technique})", flush=True)
+            else:
+                print(f"[video] {scene_id}: forced-local failed ({output_or_error}), keeping in dynamic", flush=True)
+                dynamic_scenes.append(scene)
 
     video_result: dict[str, Any]
     if dynamic_scenes:

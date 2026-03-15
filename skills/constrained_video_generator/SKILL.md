@@ -50,10 +50,29 @@ description: Generate constrained video clip metadata from storyboard scenes and
 2. 将修正记录到 `orchestration/decisions.jsonl`
 3. 再执行脚本
 
+## 本地渲染技术说明
+
+storyboard 中 `local_render_technique` 字段控制 FFmpeg 渲染方式：
+
+| 值 | 效果 |
+|---|---|
+| `loop` | 单图静止循环 |
+| `sequence` | 多图依次播放 |
+| `alternating` | 两图快速交替（模拟运动感） |
+| `crossfade` | 两图缓慢淡入淡出 |
+| `zoom_in/zoom_out/pan_left/pan_right` | Ken Burns 效果 |
+
+如果 storyboard 未设置 `local_render_technique`，脚本会根据 `motion_intent` 自动选择：
+- `fast_push/whip_pan/handheld` → `alternating`
+- `slow_pan` → `zoom_in`
+- `locked` + 多图 → `crossfade`
+- 其他 → `sequence` 或 `loop`
+
 ## Runtime Expectations
 
-- 调用 `python scripts/run_constrained_video_generator.py --project <name>`
-- 项目级默认模型来自 `input/input.json` 的 `video_model`
+- 调用 `python scripts/run_constrained_video_generator.py --project <name> [--max-video-calls 2]`
+- 默认最多 2 次视频模型调用，超出的场景按优先级降级为本地渲染
+- 优先级：`fast_push/whip_pan/handheld/black_flash` > 其他 `mixed` 场景（时长长者优先）
 - 脚本会自动分流：static 场景走 FFmpeg，dynamic 场景调 Poe API
 - 输出必须保留 scene 与 request 的映射关系
 - `video/requests.json` 的 `strategy` 字段记录了静态/动态场景数量，可用于验证分流结果
