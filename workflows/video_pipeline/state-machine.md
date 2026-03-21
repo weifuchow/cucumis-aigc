@@ -6,6 +6,36 @@
 
 状态推进的判断者默认是 `master_orchestrator`，并应将其快照写入 `projects/<project>/orchestration/state.json`。
 
+## 阶段分类
+
+| 类型 | 说明 |
+|------|------|
+| **Claude 推理阶段** | Claude Code 读取文件、做判断、直接写 JSON 产物；不调用任何脚本 |
+| **纯执行阶段（批处理）** | 调用 Python 脚本执行 API/FFmpeg；无模型推理；可批量串联运行 |
+
+---
+
+## 简化后的 7 阶段流程
+
+```
+[Claude] creative_design
+    ↓ input/input.json
+[Claude] script_writer
+    ↓ script/script.json
+[Script] audio_pipeline        ← audio_foundation + global_timeline_initializer
+    ↓ audio/*.json + timeline/global-timeline.json
+[Claude] beat_sync_storyboard_planner
+    ↓ storyboard/storyboard.json
+[Claude] asset_planner
+    ↓ assets/asset-plan.json
+[Script] visual_pipeline       ← asset_planner(validate) + image_generator + constrained_video_generator
+    ↓ assets/images/** + video/clips.json
+[Script] post_pipeline         ← subtitle_asset_manager + timeline_builder + ffmpeg_renderer_reviewer
+    ↓ outputs/final.mp4
+```
+
+---
+
 ## States
 
 ### `created`
@@ -16,66 +46,82 @@
 
 ### `input_parsed`
 
-- `input/input.json` 已生成
-- 输入已满足下游脚本生成的最低要求
+- `input/input.json` 已生成（`creative_design` 输出）
+- 风格、时长、语言、画幅比等参数已确认
 
 ### `script_generated`
 
-- `script/script.json` 已生成
+- `script/script.json` 已生成（`script_writer` 输出）
 - 听觉轨、视觉轨和情绪标注已落盘
 
 ### `audio_founded`
 
-- `audio/voiceover.json` 已生成
-- `audio/bgm-selection.json` 已生成
-- `audio/beat-grid.json` 已生成
-
-### `global_timeline_initialized`
-
+- `audio_pipeline` 批处理完成
+- `audio/voiceover.json`、`audio/bgm-selection.json`、`audio/beat-grid.json` 已生成
 - `timeline/global-timeline.json` 已生成
-- 全局时间网格已锁定
 
 ### `storyboard_planned`
 
-- `storyboard/storyboard.json` 已生成
-- scene 列表已与音频时间网格对齐
+- `storyboard/storyboard.json` 已生成（`beat_sync_storyboard_planner` 输出）
+- 场景列表已与音频时间网格对齐
 
-### `timeline_built`
+### `asset_planned`
 
-- `timeline/timeline.json` 已生成
-- 渲染层所需的最小结构已齐备
+- `assets/asset-plan.json` 已生成（`asset_planner` Claude 输出）
+- 角色视图、场景建立图、每场景关键帧方案已确定
+- `decisions` 块已写明是否需要角色图/场景图
 
-### `render_planned`
+### `visuals_generated`
 
-- `outputs/render-plan.json` 已生成
-- 第一版允许渲染器只输出占位计划，而不是最终视频
+- `visual_pipeline` 批处理完成
+- `assets/images/` 已按三阶段结构生成（characters/ + locations/ + scenes/）
+- `assets/manifest.json` 已更新
+- `video/clips.json` 已生成
 
 ### `completed`
 
-- 本轮工作流执行完成
-- 关键产物和事件日志存在
+- `post_pipeline` 批处理完成
+- `subtitles/subtitles.json` 已生成
+- `timeline/timeline.json` 已生成
+- `outputs/final.mp4` 已渲染
 
 ### `failed`
 
 - 任一阶段报错
 - 必须记录失败阶段、失败原因和恢复建议
 
+---
+
 ## Transitions
 
 ```text
 created
-  -> input_parsed
-  -> script_generated
-  -> audio_founded
-  -> global_timeline_initialized
-  -> storyboard_planned
-  -> timeline_built
-  -> render_planned
-  -> completed
+  -> input_parsed          (creative_design)
+  -> script_generated      (script_writer)
+  -> audio_founded         (audio_pipeline)
+  -> storyboard_planned    (beat_sync_storyboard_planner)
+  -> asset_planned         (asset_planner)
+  -> visuals_generated     (visual_pipeline)
+  -> completed             (post_pipeline)
 
-created/input_parsed/script_generated/audio_founded/global_timeline_initialized/storyboard_planned/timeline_built/render_planned
-  -> failed
+任意状态 -> failed
 ```
+
+---
+
+## 批处理命令参考
+
+```bash
+# 纯执行阶段 — 直接运行批处理脚本
+python scripts/run_audio_pipeline.py   --project projects/<name>
+python scripts/run_visual_pipeline.py  --project projects/<name>
+python scripts/run_post_pipeline.py    --project projects/<name>
+
+# Claude 推理阶段 — 由 Claude Code skill 触发，无需手动运行脚本
+# creative_design / script_writer / beat_sync_storyboard_planner / asset_planner
+```
+
+---
 
 ## Failure Rules
 

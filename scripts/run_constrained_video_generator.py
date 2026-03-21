@@ -16,6 +16,7 @@ from typing import Any
 from poe.client import load_poe_config
 from poe.media import generate_video
 from poe.usage import append_cost_event, write_usage_json
+from providers.factory import load_provider
 
 
 def parse_args() -> argparse.Namespace:
@@ -483,6 +484,129 @@ def load_prompt_map(project_dir: pathlib.Path) -> dict[str, dict[str, Any]]:
     return result
 
 
+def _generate_with_multiframe(
+    dynamic_scenes: list[dict[str, Any]],
+    scene_images: dict[str, list[dict[str, Any]]],
+    project_dir: pathlib.Path,
+    task_input: dict[str, Any],
+) -> dict[str, Any]:
+    """Generate video clips using Vidu multiframe API for scenes with 3+ keyframe images.
+
+    For each dynamic scene:
+      - Collects scene keyframe images (sorted by frame_index)
+      - Selects start_image + 2-3 segment images to hit target duration (~5s)
+      - Calls provider.generate_multiframe_video()
+      - Falls back to single-image img2video when fewer than 2 images available
+
+    Returns a dict shaped like generate_video() output:
+      {mode, model, clips: [{scene_id, url, duration_seconds, ...}], usage}
+    """
+    provider = load_provider()
+    video_model = str(task_input.get("video_model", "viduq3-turbo"))
+    aspect_ratio = str(task_input.get("aspect_ratio", "9:16"))
+
+    clips: list[dict[str, Any]] = []
+    total_credits = 0
+
+    for scene in dynamic_scenes:
+        scene_id = str(scene.get("scene_id", ""))
+        target_duration = float(scene.get("duration_seconds", 5.0))
+        motion_intent = str(scene.get("motion_intent", "mixed"))
+
+        # Gather this scene's keyframe images (sorted by frame_index)
+        scene_imgs = scene_images.get(scene_id, [])
+        image_paths = [
+            str(project_dir / str(item.get("path", "")))
+            for item in sorted(scene_imgs, key=lambda x: int(x.get("frame_index", 1)))
+            if item.get("path") and (project_dir / str(item.get("path", ""))).is_file()
+        ]
+
+        if len(image_paths) < 2:
+            # Not enough images for multiframe — use standard generate_video fallback
+            print(f"[video] {scene_id}: only {len(image_paths)} image(s), falling back to generate_video", flush=True)
+            fallback_result = provider.generate_video(
+                video_model,
+                [dict(scene, _ref_images=[{"path": p} for p in image_paths])],
+                aspect_ratio,
+            )
+            for clip in fallback_result.get("clips", []):
+                clips.append(clip)
+            total_credits += int((fallback_result.get("usage") or {}).get("credits", 0) or (fallback_result.get("usage") or {}).get("cost_points", 0))
+            continue
+
+        # Select keyframes for multiframe:
+        # start_image + image_settings (2-3 segments to approximate target_duration)
+        # Vidu constraint: each segment duration 2-7s (integers)
+        n_segments = min(3, len(image_paths) - 1)  # 1-3 transition segments
+        segment_duration = max(2, min(7, round(target_duration / max(1, n_segments))))
+        # Pick evenly-spaced frames: first, ~middle(s), last
+        indices: list[int] = [0]
+        if n_segments >= 2 and len(image_paths) >= 3:
+            mid = len(image_paths) // 2
+            indices.append(mid)
+        indices.append(len(image_paths) - 1)
+        # Deduplicate while preserving order
+        seen: set[int] = set()
+        selected_indices: list[int] = []
+        for idx in indices:
+            if idx not in seen:
+                seen.add(idx)
+                selected_indices.append(idx)
+
+        start_image = image_paths[selected_indices[0]]
+        image_settings = [
+            {"key_image": image_paths[i], "duration": segment_duration}
+            for i in selected_indices[1:]
+        ]
+
+        print(
+            f"[video] {scene_id}: multiframe {len(selected_indices)} frames, "
+            f"{segment_duration}s/segment, target={target_duration:.1f}s",
+            flush=True,
+        )
+
+        try:
+            result = provider.generate_multiframe_video(
+                video_model,
+                start_image,
+                image_settings,
+            )
+            url = str(result.get("url", ""))
+            total_credits += int((result.get("usage") or {}).get("credits", 0))
+            clips.append({
+                "scene_id": scene_id,
+                "duration_seconds": target_duration,
+                "url": url,
+                "motion_intent": motion_intent,
+                "source_mode": "multiframe_vidu",
+                "task_id": result.get("request_id", ""),
+                "planning": {
+                    "keyframe_count": len(selected_indices),
+                    "segment_duration": segment_duration,
+                    "selected_frame_paths": [image_paths[i] for i in selected_indices],
+                },
+            })
+        except Exception as exc:
+            print(f"[video] {scene_id}: multiframe failed ({exc}), clip url will be empty", file=sys.stderr)
+            clips.append({
+                "scene_id": scene_id,
+                "duration_seconds": target_duration,
+                "url": f"error://multiframe/{scene_id}",
+                "motion_intent": motion_intent,
+                "source_mode": "multiframe_error",
+                "error": str(exc),
+            })
+
+    return {
+        "mode": "multiframe_vidu",
+        "model": video_model,
+        "request_id": clips[-1].get("task_id", "") if clips else "",
+        "clips": clips,
+        "raw_response": {"provider": "vidu", "clip_count": len(clips)},
+        "usage": {"credits": total_credits, "mode": "live"},
+    }
+
+
 def main() -> int:
     args = parse_args()
     project_dir = pathlib.Path(args.project).resolve()
@@ -625,15 +749,25 @@ def main() -> int:
 
     video_result: dict[str, Any]
     if dynamic_scenes:
-        # Prefer project-local Poe config (projects/<project>/.env) to support per-project keys.
-        project_env = project_dir / ".env"
-        config = load_poe_config(env_path=project_env if project_env.is_file() else None)
-        video_result = generate_video(
-            config=config,
-            model=str(task_input["video_model"]),
-            scenes=dynamic_scenes,
-            aspect_ratio=str(task_input["aspect_ratio"]),
-        )
+        # Use Vidu multiframe when provider supports it (MEDIA_PROVIDER=vidu in .env)
+        _provider = load_provider()
+        if _provider.supports("multiframe_video"):
+            video_result = _generate_with_multiframe(
+                dynamic_scenes=dynamic_scenes,
+                scene_images=scene_images,
+                project_dir=project_dir,
+                task_input=task_input,
+            )
+        else:
+            # Prefer project-local Poe config (projects/<project>/.env) to support per-project keys.
+            project_env = project_dir / ".env"
+            config = load_poe_config(env_path=project_env if project_env.is_file() else None)
+            video_result = generate_video(
+                config=config,
+                model=str(task_input["video_model"]),
+                scenes=dynamic_scenes,
+                aspect_ratio=str(task_input["aspect_ratio"]),
+            )
     else:
         video_result = {
             "mode": "local_static_only",

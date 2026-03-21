@@ -1,0 +1,136 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AssetPlan",
+  "description": "Structured image generation plan produced by asset_planner. Defines characters, locations, and per-scene keyframe plans for high-stability image generation.",
+  "type": "object",
+  "required": ["metadata", "decisions", "characters", "locations", "scenes"],
+  "properties": {
+    "decisions": {
+      "type": "object",
+      "description": "LLM's explicit decisions about which asset types are needed for this project",
+      "required": ["has_characters", "has_locations"],
+      "properties": {
+        "has_characters": {
+          "type": "boolean",
+          "description": "True if the video features characters requiring visual consistency"
+        },
+        "character_reason": {
+          "type": "string",
+          "description": "Why characters are or are not needed"
+        },
+        "has_locations": {
+          "type": "boolean",
+          "description": "True if the video features specific locations requiring establishing shots"
+        },
+        "location_reason": {
+          "type": "string",
+          "description": "Why locations are or are not needed"
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["schema_version", "generated_by"],
+      "properties": {
+        "schema_version": { "type": "string" },
+        "generated_by": { "type": "string" },
+        "model": { "type": "string" },
+        "source_script": { "type": "string" },
+        "source_storyboard": { "type": "string" }
+      }
+    },
+    "characters": {
+      "type": "array",
+      "description": "Character base image specs. Empty array [] when has_characters is false (e.g. landscape videos).",
+      "items": {
+        "type": "object",
+        "required": ["char_id", "name", "description", "style_lock", "negative_lock", "views"],
+        "properties": {
+          "char_id": { "type": "string" },
+          "name": { "type": "string" },
+          "description": { "type": "string", "description": "外貌、服装、特征的详细描述" },
+          "style_lock": { "type": "string", "description": "用于保持一致性的风格固定词" },
+          "negative_lock": { "type": "string", "description": "生成时的负面提示词" },
+          "views": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["view_id", "view_type", "prompt"],
+              "properties": {
+                "view_id": { "type": "string" },
+                "view_type": {
+                  "type": "string",
+                  "enum": ["front", "side", "three_quarter", "closeup", "full_body", "action", "expression_sheet"]
+                },
+                "prompt": { "type": "string" },
+                "negative_prompt": { "type": "string" },
+                "aspect_ratio": { "type": "string", "default": "9:16" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "locations": {
+      "type": "array",
+      "description": "Location establishing shot specs. Empty array [] when has_locations is false (e.g. abstract content).",
+      "items": {
+        "type": "object",
+        "required": ["loc_id", "name", "description", "prompt"],
+        "properties": {
+          "loc_id": { "type": "string" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "atmosphere": { "type": "string" },
+          "prompt": { "type": "string" },
+          "negative_prompt": { "type": "string" },
+          "aspect_ratio": { "type": "string", "default": "9:16" }
+        }
+      }
+    },
+    "scenes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["scene_id", "duration_seconds", "keyframes"],
+        "properties": {
+          "scene_id": { "type": "string" },
+          "start_time": { "type": "number" },
+          "end_time": { "type": "number" },
+          "duration_seconds": { "type": "number" },
+          "char_refs": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "character char_id values appearing in this scene"
+          },
+          "loc_ref": {
+            "type": "string",
+            "description": "location loc_id for this scene"
+          },
+          "keyframes": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 7,
+            "items": {
+              "type": "object",
+              "required": ["keyframe_id", "timestamp", "description", "prompt"],
+              "properties": {
+                "keyframe_id": { "type": "string" },
+                "timestamp": { "type": "number", "description": "seconds from scene start" },
+                "frame_type": {
+                  "type": "string",
+                  "enum": ["establishing", "action", "reaction", "closeup", "wide", "transition", "climax"]
+                },
+                "description": { "type": "string" },
+                "prompt": { "type": "string" },
+                "negative_prompt": { "type": "string" },
+                "aspect_ratio": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
