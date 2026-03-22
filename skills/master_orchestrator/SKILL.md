@@ -53,6 +53,33 @@ description: Inspect workflow state choose next stage and write orchestration de
 
 ## Required Outputs
 
+### `orchestration/task-card.md` ⭐ 最重要
+
+**每次做出阶段决策后必须立即更新此文件。** 格式固定、极简、不超过 20 行：
+
+```markdown
+# Task Card — <project>
+更新时间：<timestamp>
+
+## 当前状态
+- 项目：<project>
+- 当前阶段：<current_stage>
+- 已完成：<completed_stages 逗号分隔>
+
+## 下一步（最重要）
+**<下一步具体操作，一句话>**
+
+例如：运行 `python3 scripts/run_image_generator.py --project vidu-new --phase scenes --max-scenes 2`
+
+## 等待事项
+- <如有人工确认检查点，列出在此；否则写"无">
+
+## 已知阻塞
+- <当前已知错误或阻塞点；否则写"无">
+```
+
+**此文件是唯一需要在多轮对话间保持一致的上下文锚点。** 任何阶段推进、检查点等待、错误发生后都必须更新。
+
 ### `orchestration/state.json`
 
 记录当前状态快照，例如：

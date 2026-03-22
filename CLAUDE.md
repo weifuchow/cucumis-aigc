@@ -91,6 +91,21 @@ cucumis-aigc/
 └── examples/                  # Reference examples
 ```
 
+## Session Start Protocol (MUST FOLLOW)
+
+**Every time you begin working on a project — whether resuming after discussion, starting fresh, or continuing after interruption — you MUST do the following FIRST, before any other action:**
+
+1. Read `projects/<project>/orchestration/task-card.md` if it exists
+2. Read `projects/<project>/orchestration/state.json`
+3. Output a one-line status: `[Project: <name>] [Stage: <current>] [Next: <action>]`
+4. Then proceed with the user's request
+
+**This protocol applies even when the user asks about something unrelated to the pipeline (e.g., debugging, editing prompts). Always anchor yourself to the current stage before acting.**
+
+If `task-card.md` does not exist, create it immediately after reading `state.json`.
+
+---
+
 ## Project Directory Structure (Per Project)
 
 Each project in `projects/<project-name>/` follows this structure:
@@ -102,7 +117,8 @@ events/events.jsonl               # Immutable event log
 orchestration/
   ├── state.json                  # Current workflow state
   ├── plan.json                   # Execution plan
-  └── decisions.jsonl             # Manual intervention decisions
+  ├── decisions.jsonl             # Manual intervention decisions
+  └── task-card.md                # ⭐ CURRENT TASK CARD — always read first
 input/input.json                  # Standardized task input
 script/script.json                # Script with emotion markers
 audio/
