@@ -12,6 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 _REGISTRY: dict[str, str] = {
     "poe": "providers.poe:make_poe_provider",
     "vidu": "providers.vidu:make_vidu_provider",
+    "vidu_web": "providers.vidu_web:make_vidu_web_provider",
 }
 
 

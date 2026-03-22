@@ -4,3 +4,8 @@ __pycache__/
 .env
 projects/*
 !projects/.gitkeep
+.DS_Store
+.playwright-mcp/
+outputs/
+*.png
+*.mp4
