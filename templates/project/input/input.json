@@ -7,9 +7,17 @@
   "style": "",
   "music_emotion": "",
   "pacing_preference": "",
+  "audio_mode": "single_narration",
   "audio_model": "elevenlabs-v3",
   "image_model": "flux-schnell",
   "video_model": "veo-3.1-fast",
   "requires_voiceover": true,
-  "requires_subtitles": true
+  "requires_subtitles": true,
+  "bgm": {
+    "generate": false,
+    "bgm_model": "lyria",
+    "mood": "",
+    "volume_db": -18,
+    "duck_during_speech": true
+  }
 }

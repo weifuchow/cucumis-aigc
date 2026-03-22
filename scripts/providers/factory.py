@@ -40,20 +40,18 @@ def load_provider(
       2. OS environment variables
       3. ``.env`` file at repo root
 
-    Supported values: ``poe`` (default), ``vidu``
+    Supported values: ``poe``, ``vidu``, ``vidu_web`` (default)
 
     Example .env::
 
-        MEDIA_PROVIDER=vidu
-        VIDU_API_KEY=your-key
-        VIDU_VOICE_ID=zh-CN-XiaoxiaoNeural
+        MEDIA_PROVIDER=vidu_web
     """
     env_values = dict(_read_dotenv(env_path or REPO_ROOT / ".env"))
     env_values.update(os.environ)
     if env:
         env_values.update(env)
 
-    provider_name = env_values.get("MEDIA_PROVIDER", "poe").strip().lower()
+    provider_name = env_values.get("MEDIA_PROVIDER", "vidu_web").strip().lower()
 
     entry = _REGISTRY.get(provider_name)
     if entry is None:

@@ -179,23 +179,30 @@ def main() -> int:
         except json.JSONDecodeError:
             pass
 
-    timeline_payload = {
-        "metadata": {
-            "global_timeline_source": "timeline/global-timeline.json",
-            "storyboard_source": "storyboard/storyboard.json",
-            "clips_source": "video/clips.json",
-            "voiceover_source": "audio/voiceover.json",
-            "scene_count": len(segments),
-            "beat_anchor_count": len(global_timeline.get("beat_anchors", [])),
-            "duration_seconds": total_duration,
-        },
-        "tracks": [
+    # 若混音文件存在，合并为单音频轨；否则保留旁白+BGM双轨
+    mix_manifest_path = project_dir / "audio" / "mix-manifest.json"
+    mixed_audio_path = project_dir / "audio" / "mixed-final.mp3"
+    use_mixed = mix_manifest_path.is_file() and mixed_audio_path.is_file()
+
+    if use_mixed:
+        audio_source_note = "audio/mixed-final.mp3"
+        audio_tracks: list[dict[str, Any]] = [
             {
-                "track_id": "video_main",
-                "track_type": "video",
-                "source": "video/clips.json",
-                "items": video_items,
-            },
+                "track_id": "audio_mixed",
+                "track_type": "audio",
+                "source": "audio/mixed-final.mp3",
+                "items": [
+                    {
+                        "item_id": "mixed-item-1",
+                        "start": 0.0,
+                        "end": total_duration,
+                    }
+                ],
+            }
+        ]
+    else:
+        audio_source_note = "audio/voiceover.json"
+        audio_tracks = [
             {
                 "track_id": "audio_voiceover",
                 "track_type": "audio",
@@ -208,6 +215,27 @@ def main() -> int:
                 "source": "audio/bgm-selection.json",
                 "items": bgm_items,
             },
+        ]
+
+    timeline_payload = {
+        "metadata": {
+            "global_timeline_source": "timeline/global-timeline.json",
+            "storyboard_source": "storyboard/storyboard.json",
+            "clips_source": "video/clips.json",
+            "voiceover_source": "audio/voiceover.json",
+            "audio_source": audio_source_note,
+            "scene_count": len(segments),
+            "beat_anchor_count": len(global_timeline.get("beat_anchors", [])),
+            "duration_seconds": total_duration,
+        },
+        "tracks": [
+            {
+                "track_id": "video_main",
+                "track_type": "video",
+                "source": "video/clips.json",
+                "items": video_items,
+            },
+            *audio_tracks,
         ],
         "segments": segments,
         "output": {
