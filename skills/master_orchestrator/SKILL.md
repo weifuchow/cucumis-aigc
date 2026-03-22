@@ -1,5 +1,5 @@
 ---
-name: master-orchestrator
+name: master_orchestrator
 description: Inspect workflow state choose next stage and write orchestration decisions. Use for stage planning recovery and control flow.
 ---
 
@@ -36,20 +36,25 @@ description: Inspect workflow state choose next stage and write orchestration de
 
 ## Control Model
 
-第一版采用“固定主链 + 条件跳过”模型，默认主链为：
+固定主链（9 步），合并了原 12 步中的薄 skill：
 
 1. `creative_design`
 2. `script_writer`
-3. `audio_foundation`
-4. `global_timeline_initializer`
-5. `beat_sync_storyboard_planner`
-6. `keyframe_planner`
-7. `prompt_engineer`
-8. `image_generator`
-9. `constrained_video_generator`
-10. `subtitle_asset_manager`
-11. `timeline_builder`
-12. `ffmpeg_renderer_reviewer`
+3. `audio_foundation` ← 已合并 `global_timeline_initializer`
+4. `beat_sync_storyboard_planner`
+5. `image_generator`
+6. `constrained_video_generator`
+7. `timeline_builder` ← 已合并 `subtitle_asset_manager` + `ffmpeg_renderer_reviewer`
+
+**诊断工具（按需调用，不在主链）：**
+- `observer` ← 已合并 `reviewer`（健康检查 + 进度摘要）
+- `master_orchestrator`（自身）
+
+**已废弃（职责已并入上方）：**
+- `global_timeline_initializer` → 并入 `audio_foundation`
+- `subtitle_asset_manager` → 并入 `timeline_builder`
+- `ffmpeg_renderer_reviewer` → 并入 `timeline_builder`
+- `reviewer` → 并入 `observer`
 
 ## Required Outputs
 
