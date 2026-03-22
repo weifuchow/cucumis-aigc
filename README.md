@@ -1,271 +1,174 @@
 # cucumis-aigc
 
-`cucumis-aigc` 是一个面向短视频生产的本地化 AIGC 编排系统。它的目标不是提供某一个单点生成能力，而是把脚本、分镜、关键帧、图片、动态视频、配音、字幕、时间轴与渲染串成一条可控、可追踪、可恢复的生产工作流。
+> **当前版本**：v1 本地单机闭环，9 步主链，含人工检查点和会话连续性机制
 
-这不是一个“模型直接吐出视频”的黑盒产品，而是一套依托 Codex / Claude Code 运行、以 `workflow + skills` 为主控组织方式、以本地文件系统为事实来源、以 `FFmpeg` 为渲染出口的生产系统。v1 的重点是跑通本地单机闭环，建立稳定的 skill workspace 骨架，而不是提前追求平台化外壳。
+`cucumis-aigc` 是一个面向短视频生产的本地化 AIGC 编排系统。目标不是提供单点生成能力，而是把脚本、分镜、关键帧、图片、动态视频、配音、字幕、时间轴与渲染串成一条可控、可追踪、可恢复的生产工作流。
 
-## 项目定位
-
-从项目定位上看，`cucumis-aigc` 是一个视频 Agent 工作流系统，而不是单个模型项目、单个脚本工具或纯 SaaS 产品。它要解决的是“如何把多个 AIGC 能力组织成稳定的视频生产链路”，而不是“如何让某一个模型多输出一点内容”。
-
-它要交付的是生产能力，不只是生成能力。前者强调编排、状态、恢复、审查与渲染；后者通常只关注某一步是否能产出文本、图片或视频片段。`cucumis-aigc` 选择的是前者。
-
-## 为什么要做
-
-当前 AIGC 视频生产虽然已经有大量单点工具，但真实落地时仍存在明显断层：
-
-- 脚本、语音、图片、视频、字幕、剪辑通常分散在多个工具中，缺少统一编排
-- 中间产物不透明，出了问题很难定位是哪一步失真或失败
-- 分镜、关键帧、图片、动态视频之间缺少统一约束，风格一致性难以稳定
-- 整条链路往往依赖人工切换工具，自动化程度低
-- 成本常常堆积在错误的地方，例如把整条视频都交给昂贵的视频生成服务
-- 一旦某一步失败，流程经常需要人工重做，而不是从明确状态恢复
-
-这类问题说明，瓶颈并不只在模型质量，更在于缺少一套能够承载生产链路的工作流系统。`cucumis-aigc` 的核心判断是：短视频 AIGC 的关键不只是“能生成”，而是“能稳定生产”。
-
-## 项目目标
-
-`cucumis-aigc` 当前阶段的目标不是做一个功能尽可能多的平台，而是先建立一套足够稳、足够清晰、足够可扩展的本地生产骨架。
-
-现阶段重点目标包括：
-
-- 构建本地单机可落地的视频生产闭环
-- 建立统一的 `Skill` 体系，把各环节拆成可调度的业务能力单元
-- 把脚本、分镜、关键帧、素材、时间轴、成片全部落到本地目录，保证可追踪与可恢复
-- 建立基于 `Timeline Schema + FFmpeg` 的统一渲染出口
-- 为后续模板化生产、多项目管理和产品化控制台奠定基础
-
-如果 v1 做得正确，团队得到的不是一个“能跑一次”的 Demo，而是一套后续可以持续迭代的视频生产框架。
-
-## 核心架构
-
-系统的目标形态可以概括为：
-
-```text
-User Intent
-  -> Workflow Runtime (Codex / Claude Code)
-  -> Skills
-  -> Local Filesystem
-  -> Timeline Schema
-  -> FFmpeg Renderer
-  -> Observer / Reviewer
-```
-
-各层职责如下。
-
-### 1. Workflow Runtime
-
-当前阶段的主控不是常驻应用服务，而是运行在 Codex / Claude Code 上的 workflow runtime。它负责理解任务目标、拆解流程、推进状态、调度 `Skill`，并管理失败重试与人工接管。它扮演的是导演与总控，而不是把所有业务逻辑都吞进一个巨型模块里。
-
-### 2. Skills
-
-`Skill` 是业务能力单元，每个模块只负责单一职责，例如：
-
-- `creative_brief_intake`
-- `input_parser`
-- `creative_design`（创意需求定稿，整合前两步）
-- `script_writer`
-- `audio_foundation`
-- `global_timeline_initializer`
-- `beat_sync_storyboard_planner`
-- `keyframe_planner`
-- `prompt_engineer`
-- `image_generator`
-- `constrained_video_generator`
-- `subtitle_asset_manager`
-- `timeline_builder`
-- `ffmpeg_renderer_reviewer`
-- `observer`
-
-这种拆法的意义在于：每一步都可以单独优化、替换、重试、审查，而不是依赖一个不可拆解的大黑盒。
-
-### 3. Local Filesystem
-
-本地文件系统是事实来源。输入配置、脚本、分镜、关键帧、图片、视频片段、字幕、音频、时间轴、日志、事件流和最终成片都应该以标准结构落盘。
-
-这意味着系统状态不依赖模糊的运行时记忆，而依赖明确可读的项目文件。它直接决定了系统是否具备调试、恢复、人工介入和复现能力。
-
-### 4. Timeline Schema
-
-`Timeline Schema` 现在分为两层：先由 `global_timeline_initializer` 生成音频驱动的全局时间网格，再由 `timeline_builder` 生成最终渲染时间轴。前者定义绝对时间锚点，后者负责把视觉素材和转场吸附到这些锚点上。
-
-这样做的意义是把“内容生产”与“最终合成”解耦。上游模块不需要直接理解 `FFmpeg` 命令细节，只需要输出统一时间轴。
-
-### 5. FFmpeg Renderer
-
-`FFmpeg` 是本地渲染执行器，用于承接统一时间轴并输出最终 MP4 成片。它负责画面拼接、音频混合、字幕烧录、裁剪缩放、水印叠加和最终导出。
-
-这层的价值不在于“酷”，而在于它是一个稳定、可控、成本明确的本地渲染出口。
-
-### 6. Observer / Reviewer
-
-`Observer` 用于展示项目状态、当前执行步骤、事件流、日志与中间产物，承担可视化观察职责。`Reviewer` 用于在输出阶段做结果检查，例如文件是否成功生成、音频字幕是否齐全、时长是否异常。
-
-前者保证“看得见”，后者保证“能验收”。
-
-## 视频生产流程
-
-`cucumis-aigc` 不追求一步到位地吐出完整视频，而是把视频生产拆成明确阶段。每个阶段都输出结构化结果，并为下一步提供约束。
-
-### 1. 创意需求定稿
-
-`creative_design` 是默认第一步，内部整合 `creative_brief_intake` 与 `input_parser`：先把一句话需求补齐为标准 `Creative Brief`，再产出 `input/input.json` 作为全链路结构化起点。
-
-### 2. 脚本生成与情绪标注
-
-`script_writer` 生成完整脚本，并拆成听觉轨与视觉轨。更重要的是它要标记情绪节点、转折点和高潮点，为后续音频基建提供明确情绪锚点。
-
-### 3. 音频基建
-
-`audio_foundation` 基于情绪标注生成配音时间戳、BGM 匹配结果和鼓点/转折点时间网格。这一步先锁定听觉时序锚点，是整个流程的核心起点。
-
-### 4. 全局时间轴预构建
-
-`global_timeline_initializer` 把配音时间戳和 BGM 节点合并成全局时间网格，定义 narration windows、转折点、留白段和推荐切点。
-
-### 5. 踩点分镜规划
-
-`beat_sync_storyboard_planner` 在已经锁定的时间网格上写分镜。scene 时长和转场强度由全局时间网格约束，不再只是“预计”。
-
-### 6. 关键帧与一致性约束
-
-`keyframe_planner` 为每个 `scene` 定义关键视觉锚点，确保角色与场景在跨越情绪转折前后依然保持一致。
-
-### 7. 提示词翻译与增强
-
-`prompt_engineer` 把分镜描述翻译成视觉模型可执行的提示词，并补充机位、光影、画质和负面提示词。
-
-### 8. 静态图片生成
-
-`image_generator` 使用 Poe 图片模型（无密钥时自动 mock）生成首尾帧参考图、封面图和不需要动态化的静态素材，并写入调用元数据与成本日志。
-
-### 9. 约束性动态视频生成
-
-`constrained_video_generator` 在明确时长和运动意图约束下生成动态视频片段，只在情绪关键节点使用高成本视频生成。
-
-### 10. 字幕与结构化素材整理
-
-`subtitle_asset_manager` 基于音频时间戳生成字幕，并统一整理图片、视频、音效、配音和 BGM 的结构化清单。
-
-### 11. 踩点时间轴组装
-
-`timeline_builder` 把视觉切点吸附在 BGM 转折点和配音留白处，并补入必要转场与音效，生成最终工程时间轴。
-
-### 12. 渲染导出与质检
-
-`ffmpeg_renderer_reviewer` 负责最终的音视频混合、字幕压制和基础逻辑校验，输出成片。
+这不是"模型直接吐出视频"的黑盒产品，而是一套依托 Claude Code 运行、以 `workflow + skills` 为主控组织方式、以本地文件系统为事实来源、以 FFmpeg 为渲染出口的生产系统。
 
 ## 核心设计原则
 
-`cucumis-aigc` 的设计不是“先把能力堆起来再说”，而是围绕一组明确原则展开。
+- **生产能力 > 生成能力**：编排、状态管理、恢复、审查比单步生成效果更重要
+- **音频优先**：所有时序锚点锁定在配音和 BGM 节拍上，视觉跟着音频走
+- **场景时长固定 5 秒**：每场景统一 5s，场景数 = `ceil(总时长 / 5)`，全链路刚性约束
+- **文件即事实**：所有中间产物落盘为 JSON，人读机读，状态可完整恢复
+- **人工把关检查点**：角色基准图、场景关键帧逐场确认，防止废片积累
+- **上下文防污染**：图片/视频文件内容不进入 Claude 上下文，只传路径
 
-### 主控负责编排，不吞并业务细节
+## 9 步主链
 
-workflow runtime 负责流程推进和状态管理，不负责在内部实现所有业务能力。业务能力应该沉到 `Skill` 层。
+```
+1. creative_design
+   需求澄清 → 节拍表 → 角色/场景提示词设计确认 → 成本档位 → input.json
 
-### Skill 必须保持单一职责
+2. script_writer
+   情绪标注脚本生成
 
-一个 `Skill` 只解决一类问题，例如脚本、分镜、关键帧或渲染，而不是混合多个阶段的职责。这是后续复用和替换的前提。
+3. audio_foundation                        ← 含原 global_timeline_initializer
+   配音时间戳 + BGM + 节拍网格 + 全局时间网格（5s 一格）
 
-### 文件即事实
+4. beat_sync_storyboard_planner
+   踩点分镜规划（每场景固定 5s）
 
-所有关键中间产物必须落盘，并以标准结构可读可查。没有落盘、不可恢复的“临时状态”不应成为系统依赖。
+5. image_generator
+   Phase1：角色基准图 → [人工确认]
+   Phase2：场景地点参考图 → [确认]
+   Phase3：场景关键帧（每场景 4 张，kf-01 必须衔接上一场景）→ [逐场确认]
 
-### 分层生成优于黑盒一步到位
+6. constrained_video_generator
+   约束性动态视频生成（预算控制，最多 N 次视频模型调用）
 
-视频生产被拆为脚本层、音频基建层、全局时间网格层、分镜层、关键帧层、提示词层、图片层、动态视频层、字幕资产层、时间轴层与渲染层。分层不是为了增加流程，而是为了提升可控性、质量稳定性和成本控制能力。
+7. timeline_builder                        ← 含原 subtitle_asset_manager + ffmpeg_renderer_reviewer
+   字幕生成 → 时间轴组装 → FFmpeg 渲染导出
+```
 
-### 本地优先
+**诊断工具（按需调用，不在主链）：**
+- `observer`：健康检查 + 进度摘要（含原 reviewer）
+- `master_orchestrator`：状态机主控，维护 task-card.md
 
-编排、状态持久化、观察与渲染应优先在本地完成，尽量避免把系统稳定性绑死在外部平台运行时上。
+## 关键生产规则
 
-### 中间结果必须可观察、可恢复、可替换
+### 场景时长固定 5 秒
 
-任何一个环节失败时，系统应当允许从明确状态继续，而不是从头重做。任何一个环节能力升级时，也应当能在不破坏整体框架的前提下替换。
+全链路刚性约束。叙事需要更长停留时用多个连续场景，不允许修改单场景时长。
 
-## v1 边界
+### 每场景 4 张关键帧
 
-v1 的目标是形成可运行的本地工作流闭环，而不是把所有产品化能力一次做完。为了避免目标漂移，当前阶段明确不做以下事项：
+| 帧 | 时间点 | 说明 |
+|---|---|---|
+| kf-01 | 0s | 起始帧，必须与上一场景 kf-04 视觉衔接 |
+| kf-02 | 1.7s | 中间帧 A |
+| kf-03 | 3.3s | 中间帧 B |
+| kf-04 | 5s | 结束帧，供下一场景 kf-01 衔接 |
 
-- 不做云端多租户架构
-- 不做复杂在线编辑器
-- 不做多人协作工作台
-- 不做完全无人参与的全自动生产承诺
-- 不绑定单一模型或单一供应商
-- 不追求“任何题材、任何风格都一次生成成功”的泛化能力
+### 图片生成三个检查点
 
-v1 的重点只有一件事：把从输入到成片的主链路跑通，并让中间状态可见、可查、可恢复。
+1. 角色基准图全部生成 → 展示路径 → 等用户确认后继续
+2. 场景地点参考图完成 → 快速确认
+3. 每个场景 4 张图完成 → 展示路径 → 确认再继续下一场景
+
+### 上下文防污染
+
+Claude 不得将图片/视频文件内容读入对话上下文。生成结果只通过文件路径展示，用户自行打开查看。
+
+## 会话连续性
+
+Claude 每次操作前必须先读 `orchestration/task-card.md` + `orchestration/state.json`，然后输出一行状态确认再行动。task-card.md 由 master_orchestrator 在每次阶段推进后更新，格式固定、不超过 20 行。
+
+## 项目目录结构
+
+```
+projects/<name>/
+├── request.md
+├── input/input.json                      模型配置、时长、画幅
+├── brief/
+│   ├── selected-concept.json             确认的创意方案
+│   ├── character-prompts.json            角色多视角提示词
+│   └── scene-prompts.json                场景提示词草稿
+├── script/script.json
+├── audio/
+│   ├── voiceover.json
+│   ├── bgm-selection.json
+│   └── beat-grid.json
+├── timeline/
+│   ├── global-timeline.json              全局时间网格（5s 一格）
+│   └── timeline.json                     最终渲染时间轴
+├── storyboard/storyboard.json
+├── assets/
+│   ├── asset-plan.json                   角色/场景/关键帧生成计划
+│   ├── character-manifest.json           角色基准图路径索引
+│   ├── manifest.json                     全素材索引
+│   └── images/
+│       ├── characters/                   角色基准图（多视角）
+│       ├── locations/                    场景参考图
+│       └── scenes/                       场景关键帧（每场景 4 张）
+├── video/clips.json
+├── subtitles/subtitles.json
+├── outputs/
+│   ├── render-plan.json
+│   └── final.mp4
+├── orchestration/
+│   ├── state.json                        当前工作流阶段
+│   ├── task-card.md                      ⭐ 会话锚点（每轮推进后更新）
+│   ├── plan.json
+│   └── decisions.jsonl
+├── events/events.jsonl                   不可变事件日志
+└── costs/poe-usage.jsonl
+```
+
+## 仓库结构
+
+```
+cucumis-aigc/
+├── skills/                     9 个 skill 模块
+│   ├── master_orchestrator/
+│   ├── creative_design/
+│   ├── script_writer/
+│   ├── audio_foundation/       ← 含 global_timeline_initializer
+│   ├── beat_sync_storyboard_planner/
+│   ├── image_generator/
+│   ├── constrained_video_generator/
+│   ├── timeline_builder/       ← 含 subtitle_asset_manager + ffmpeg_renderer_reviewer
+│   └── observer/               ← 含 reviewer
+├── scripts/                    Python 执行入口（各 skill 独立脚本仍保留）
+├── schemas/                    JSON Schema 数据契约
+├── workflows/video_pipeline/   工作流定义文档
+├── templates/                  项目初始化模板
+├── projects/                   活跃项目实例
+├── tests/
+└── docs/plans/
+```
+
+## 快速开始
+
+```bash
+# 环境配置
+echo "POE_API_KEY=your-key" > .env
+
+# 新建项目
+python3 scripts/init_project.py --request "60秒KOF大蛇封印史诗预告"
+
+# 逐阶段执行
+python3 scripts/run_creative_design.py --project <name>
+python3 scripts/run_script_writer.py --project <name>
+python3 scripts/run_audio_foundation.py --project <name>
+python3 scripts/run_global_timeline_initializer.py --project <name>
+python3 scripts/run_beat_sync_storyboard_planner.py --project <name>
+python3 scripts/run_image_generator.py --project <name> --phase all
+python3 scripts/run_constrained_video_generator.py --project <name>
+python3 scripts/run_timeline_builder.py --project <name>
+python3 scripts/run_ffmpeg_renderer_reviewer.py --project <name> --enable-ffmpeg-export
+
+# 诊断
+python3 scripts/observe_project.py --project <name>
+python3 scripts/validate_project.py --project <name>
+
+# 上下文太长时续跑
+python3 scripts/session_handoff.py --project <name>
+```
 
 ## 路线图
 
-### v1：本地单机闭环
-
-建立 `workflows/`、核心 `skills/`、音频优先的标准项目目录、时间网格 schema、本地渲染出口和观察能力，完成从需求输入到成片输出的闭环。
-
-### v2：模板化与批量化生产
-
-在闭环稳定后，引入模板体系、批量项目处理、质量规则、素材复用、多项目管理和更稳定的风格控制能力，让系统从“能做”进入“能规模化重复做”。
-
-### v3：产品化与商业工作流
-
-在架构成熟后，逐步扩展到控制台、权限与协作、可视化配置、业务流程集成和商业场景适配，把系统从内部生产框架推进到可产品化的平台能力。
-
-## 当前仓库状态
-
-当前仓库已经进入第一版 skill workspace 骨架阶段，但仍然远未完成完整生产能力。这意味着 README 中描述的目录结构、模块职责与流程形态，一部分已经落到仓库，一部分仍然是接下来要逐步补齐的目标。
-
-当前已经落地的重点包括：
-
-- `skills/` 中的核心与占位 skill 定义
-- `workflows/video_pipeline/` 中的主流程文档
-- `schemas/` 中的共享结构契约
-- `templates/`、`examples/` 和 `scripts/` 中的最小可执行骨架
-
-对于后续开发，README 的角色仍然是上位说明书；更细的模块设计、接口约定和实现计划，应继续沉淀到 `docs/plans/` 等设计文档中。
-
-## 当前工作区结构
-
-下面的结构更接近当前仓库已经采用的组织方式：
-
-```text
-cucumis-aigc/
-  workflows/
-    video_pipeline/
-  skills/
-    master_orchestrator/
-    creative_design/
-    creative_brief_intake/
-    input_parser/
-    script_writer/
-    audio_foundation/
-    global_timeline_initializer/
-    beat_sync_storyboard_planner/
-    keyframe_planner/
-    prompt_engineer/
-    image_generator/
-    constrained_video_generator/
-    subtitle_asset_manager/
-    timeline_builder/
-    ffmpeg_renderer_reviewer/
-    observer/
-  schemas/
-  templates/
-  projects/
-  examples/
-  scripts/
-  docs/
-```
-
-这套结构表达的是“workflow 组织 + skill 执行 + 文件系统落盘”的工作方式，而不是传统 Web 服务或单体应用的源码布局。
-
-## 长期价值
-
-如果 `cucumis-aigc` 按预期推进，它沉淀下来的不会只是“一次性视频生成脚本”，而是一套面向视频内容生产的操作系统雏形。
-
-它的长期价值主要体现在三点：
-
-- 把零散 AIGC 能力整合成稳定生产链路
-- 把内容生成从一次性试错，推进到可复用、可恢复、可审查的工程体系
-- 为模板化内容工厂、垂类工作流和商业化产品形态打下基础
-
-因此，这个项目的核心资产不是某一个模型调用，而是整条工作流的组织能力。
+- **v1（当前）**：本地单机闭环，9 步主链，人工检查点，会话连续性
+- **v2**：模板化批量生产，风格一致性增强，多项目管理
+- **v3**：产品化控制台，权限协作，商业场景适配
