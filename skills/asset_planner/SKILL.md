@@ -1,3 +1,8 @@
+---
+name: asset-planner
+description: Analyze script and storyboard artifacts to produce assets/asset-plan.json for image planning. Use after storyboard exists and before image generation.
+---
+
 # Skill: asset_planner
 
 ## 职责
