@@ -1,5 +1,24 @@
 # cucumis-aigc
 
+## Web Console
+
+仓库现在包含一个第一版 web 控制台骨架，位于 `apps/web/`。它使用 `Next.js + TypeScript` 作为 UI / API 层，并通过 Claude Agent SDK 和受控的 Python stage 适配层来驱动现有 `projects/<project>/` 工作流。
+
+启动说明见 `apps/web/README.md`。
+
+## Skill Shortcuts
+
+仓库原生 skills 仍然放在 `skills/`。如果你希望同一份 skills 同时被 Claude Agent SDK 和 Codex 发现，执行：
+
+```bash
+python3 scripts/sync_agent_skill_shortcuts.py
+```
+
+它会创建：
+
+- `.claude/skills -> skills`
+- `~/.agents/skills/cucumis-aigc -> <repo>/skills`
+
 > **当前版本**：v1 本地单机闭环，9 步主链，含人工检查点和会话连续性机制
 
 `cucumis-aigc` 是一个面向短视频生产的本地化 AIGC 编排系统。目标不是提供单点生成能力，而是把脚本、分镜、关键帧、图片、动态视频、配音、字幕、时间轴与渲染串成一条可控、可追踪、可恢复的生产工作流。
