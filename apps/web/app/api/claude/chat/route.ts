@@ -7,7 +7,7 @@ import { runDirectClaudeChat } from "@/lib/agent/direct-chat";
 export const runtime = "nodejs";
 
 const bodySchema = z.object({
-  provider: z.enum(["claude", "codex"]).default("claude"),
+  provider: z.enum(["claude", "codex"]).default("codex"),
   messages: z
     .array(
       z.object({
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Claude chat request failed.";
+    const message = error instanceof Error ? error.message : "Agent chat request failed.";
     console.error("claude chat route failed", error);
     return NextResponse.json({ error: message }, { status: 500 });
   }

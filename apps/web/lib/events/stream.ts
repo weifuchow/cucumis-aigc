@@ -1,5 +1,5 @@
 import { POLL_INTERVAL_MS } from "@/lib/config";
-import { getProjectDetail } from "@/lib/projects/store";
+import { getProjectWorkbenchSnapshot } from "@/lib/workbench/projector";
 
 function encodeEvent(name: string, data: unknown) {
   return `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -14,7 +14,8 @@ export function createProjectStream(projectId: string) {
       const encoder = new TextEncoder();
 
       const pushSnapshot = async () => {
-        const project = await getProjectDetail(projectId);
+        const snapshot = await getProjectWorkbenchSnapshot(projectId);
+        const project = snapshot.project;
         const signature = JSON.stringify({
           updatedAt: project.updatedAt,
           runtimeStatus: project.runtimeStatus,
@@ -29,7 +30,7 @@ export function createProjectStream(projectId: string) {
         }
 
         lastSignature = signature;
-        controller.enqueue(encoder.encode(encodeEvent("project.snapshot", { project })));
+        controller.enqueue(encoder.encode(encodeEvent("project.snapshot", snapshot)));
       };
 
       await pushSnapshot();

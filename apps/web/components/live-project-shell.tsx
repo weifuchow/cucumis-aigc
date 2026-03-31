@@ -33,7 +33,7 @@ type ChatMessage = {
 
 const PROVIDER_LABELS: Record<AgentProvider, string> = {
   claude: "Claude Code Agent",
-  codex: "Codex",
+  codex: "Codex Agent",
 };
 
 const INITIAL_HISTORIES: Record<AgentProvider, ChatMessage[]> = {
@@ -53,7 +53,7 @@ const INITIAL_HISTORIES: Record<AgentProvider, ChatMessage[]> = {
 
 export function LiveProjectShell({ initialProject }: LiveProjectShellProps) {
   const [project, setProject] = useState(initialProject);
-  const [provider, setProvider] = useState<AgentProvider>("claude");
+  const [provider, setProvider] = useState<AgentProvider>("codex");
   const [histories, setHistories] = useState<Record<AgentProvider, ChatMessage[]>>(INITIAL_HISTORIES);
   const [drafts, setDrafts] = useState<Record<AgentProvider, string>>({
     claude: "解释一下当前状态，并告诉我下一步。",

@@ -34,7 +34,7 @@ const INITIAL_MESSAGES: Record<AgentProvider, ChatMessage[]> = {
 };
 
 export function ClaudePlayground() {
-  const [provider, setProvider] = useState<AgentProvider>("claude");
+  const [provider, setProvider] = useState<AgentProvider>("codex");
   const [histories, setHistories] = useState<Record<AgentProvider, ChatMessage[]>>(INITIAL_MESSAGES);
   const [drafts, setDrafts] = useState<Record<AgentProvider, string>>({
     claude: "我的电脑还剩多少空间？请直接帮我查。",
@@ -167,7 +167,7 @@ export function ClaudePlayground() {
             </div>
           </div>
           <p className="muted">
-            同一个页面里可以切换 `Claude` 和 `Codex`。两边历史独立，回复按 Markdown 渲染。
+            默认使用 `Codex`，也可以切换到 `Claude`。两边历史独立，回复按 Markdown 渲染。
           </p>
           {error ? (
             <div className="status-note" data-tone="error">
@@ -175,7 +175,7 @@ export function ClaudePlayground() {
             </div>
           ) : (
             <div className="status-note">
-              Claude 适合本地工具问题。Codex 适合仓库理解、技能触发和代码上下文回答。
+              Codex 适合作为默认仓库代理。Claude 仍可用于本地工具问题。
             </div>
           )}
         </div>

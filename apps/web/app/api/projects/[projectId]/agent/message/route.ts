@@ -7,7 +7,7 @@ import { runProjectAgent } from "@/lib/agent/session";
 export const runtime = "nodejs";
 
 const bodySchema = z.object({
-  provider: z.enum(["claude", "codex"]).default("claude"),
+  provider: z.enum(["claude", "codex"]).default("codex"),
   messages: z
     .array(
       z.object({

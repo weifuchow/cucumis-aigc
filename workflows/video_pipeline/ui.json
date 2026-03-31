@@ -1,0 +1,172 @@
+{
+  "workflowId": "video_pipeline",
+  "formSections": [
+    {
+      "id": "core",
+      "title": "任务配置",
+      "description": "只暴露会影响最终结果的业务参数，不暴露内部 workflow 细节。",
+      "fields": [
+        {
+          "key": "duration_seconds",
+          "label": "时长（秒）",
+          "type": "number",
+          "sourcePath": "duration_seconds",
+          "placeholder": "60",
+          "visibleWhen": ["ready", "running", "blocked", "waiting_for_confirmation"],
+          "editableWhen": ["ready", "blocked", "waiting_for_confirmation"]
+        },
+        {
+          "key": "language",
+          "label": "语言",
+          "type": "text",
+          "sourcePath": "language",
+          "placeholder": "zh-CN",
+          "visibleWhen": ["ready", "running", "blocked", "waiting_for_confirmation"],
+          "editableWhen": ["ready", "blocked", "waiting_for_confirmation"]
+        },
+        {
+          "key": "aspect_ratio",
+          "label": "画幅",
+          "type": "select",
+          "sourcePath": "aspect_ratio",
+          "options": [
+            { "label": "竖屏 9:16", "value": "9:16" },
+            { "label": "横屏 16:9", "value": "16:9" },
+            { "label": "方形 1:1", "value": "1:1" }
+          ],
+          "visibleWhen": ["ready", "running", "blocked", "waiting_for_confirmation"],
+          "editableWhen": ["ready", "blocked"]
+        },
+        {
+          "key": "style",
+          "label": "风格",
+          "type": "text",
+          "sourcePath": "style",
+          "placeholder": "cinematic anime realism",
+          "visibleWhen": ["ready", "running", "blocked", "waiting_for_confirmation"],
+          "editableWhen": ["ready", "blocked", "waiting_for_confirmation"]
+        }
+      ]
+    },
+    {
+      "id": "generation",
+      "title": "生成偏好",
+      "description": "高频模型和媒体开关集中在这里。",
+      "fields": [
+        {
+          "key": "audio_model",
+          "label": "配音模型",
+          "type": "text",
+          "sourcePath": "audio_model",
+          "visibleWhen": ["ready", "running", "blocked", "waiting_for_confirmation"],
+          "editableWhen": ["ready", "blocked"]
+        },
+        {
+          "key": "image_model",
+          "label": "出图模型",
+          "type": "text",
+          "sourcePath": "image_model",
+          "visibleWhen": ["ready", "running", "blocked", "waiting_for_confirmation"],
+          "editableWhen": ["ready", "blocked", "waiting_for_confirmation"]
+        },
+        {
+          "key": "video_model",
+          "label": "视频模型",
+          "type": "text",
+          "sourcePath": "video_model",
+          "visibleWhen": ["ready", "running", "blocked", "waiting_for_confirmation"],
+          "editableWhen": ["ready", "blocked", "waiting_for_confirmation"]
+        },
+        {
+          "key": "requires_voiceover",
+          "label": "启用配音",
+          "type": "boolean",
+          "sourcePath": "requires_voiceover",
+          "visibleWhen": ["ready", "running", "blocked", "waiting_for_confirmation"],
+          "editableWhen": ["ready", "blocked"]
+        },
+        {
+          "key": "requires_subtitles",
+          "label": "启用字幕",
+          "type": "boolean",
+          "sourcePath": "requires_subtitles",
+          "visibleWhen": ["ready", "running", "blocked", "waiting_for_confirmation"],
+          "editableWhen": ["ready", "blocked"]
+        },
+        {
+          "key": "bgm_generate",
+          "label": "自动生成 BGM",
+          "type": "boolean",
+          "sourcePath": "bgm.generate",
+          "visibleWhen": ["ready", "running", "blocked", "waiting_for_confirmation"],
+          "editableWhen": ["ready", "blocked"]
+        }
+      ]
+    }
+  ],
+  "artifactSections": [
+    {
+      "id": "visual-results",
+      "title": "图片结果",
+      "description": "角色图、场景图和关键帧会集中显示在这里。",
+      "artifactTypes": ["character_images", "location_images", "scene_keyframes"]
+    },
+    {
+      "id": "text-results",
+      "title": "文本结果",
+      "description": "方案、提示词、脚本和分镜文稿。",
+      "artifactTypes": ["prompt_bundle", "script_output", "storyboard_output", "timeline_output"]
+    },
+    {
+      "id": "audio-results",
+      "title": "音频结果",
+      "description": "配音、BGM 与节拍信息。",
+      "artifactTypes": ["voiceover_audio", "bgm_assets", "beat_grid"]
+    },
+    {
+      "id": "video-results",
+      "title": "视频结果",
+      "description": "视频片段、导出计划和最终成片。",
+      "artifactTypes": ["video_clips", "render_plan", "final_video"]
+    }
+  ],
+  "pendingActions": [
+    {
+      "id": "continue_workflow",
+      "label": "继续执行",
+      "description": "按照当前状态推进到下一步。",
+      "kind": "run",
+      "visibleWhen": {
+        "runtimeStatuses": ["ready", "running", "blocked", "waiting_for_confirmation"]
+      }
+    },
+    {
+      "id": "refresh_review",
+      "label": "刷新诊断",
+      "description": "重新生成 review、observer 与 handoff。",
+      "kind": "review",
+      "visibleWhen": {
+        "runtimeStatuses": ["ready", "running", "blocked", "failed", "waiting_for_confirmation", "completed"]
+      }
+    },
+    {
+      "id": "approve_current_results",
+      "label": "确认当前结果并继续",
+      "description": "记录一次人工确认，供后续流程继续执行。",
+      "kind": "confirm",
+      "decisionType": "artifact_batch_confirmed",
+      "visibleWhen": {
+        "runtimeStatuses": ["ready", "waiting_for_confirmation"],
+        "artifactSectionIds": ["visual-results", "video-results"]
+      }
+    }
+  ],
+  "statusCopy": {
+    "ready": "已就绪，可继续推进下一步。",
+    "running": "流程正在执行中，新的结果会自动出现在下面。",
+    "waiting_for_confirmation": "当前结果需要人工确认后再继续。",
+    "blocked": "流程被阻塞，建议先检查诊断和缺失项。",
+    "failed": "最近一次执行失败，需要先查看错误和恢复建议。",
+    "completed": "流程已完成，可以直接查看成片和导出结果。"
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Workflow UI Schema",
+  "type": "object",
+  "required": ["workflowId", "formSections", "artifactSections", "pendingActions", "statusCopy"],
+  "properties": {
+    "workflowId": { "type": "string" },
+    "formSections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "fields"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["key", "label", "type", "sourcePath"],
+              "properties": {
+                "key": { "type": "string" },
+                "label": { "type": "string" },
+                "description": { "type": "string" },
+                "type": { "enum": ["text", "number", "select", "boolean"] },
+                "sourcePath": { "type": "string" },
+                "placeholder": { "type": "string" },
+                "visibleWhen": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "editableWhen": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["label", "value"],
+                    "properties": {
+                      "label": { "type": "string" },
+                      "value": { "type": ["string", "number", "boolean"] }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "artifactSections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "artifactTypes"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "artifactTypes": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "pendingActions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "kind"],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string" },
+          "description": { "type": "string" },
+          "kind": { "enum": ["run", "review", "confirm"] },
+          "decisionType": { "type": "string" },
+          "visibleWhen": {
+            "type": "object",
+            "properties": {
+              "runtimeStatuses": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "artifactSectionIds": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "statusCopy": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}
