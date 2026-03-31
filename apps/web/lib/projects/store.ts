@@ -74,6 +74,10 @@ function deriveRuntimeStatus(state: ProjectStateFile, review: ProjectReview): Pr
     return "blocked";
   }
 
+  if (!state.current_stage && !state.next_stage && !state.completed_stages.length) {
+    return "ready";
+  }
+
   if (state.current_stage && !state.next_stage) {
     return "running";
   }

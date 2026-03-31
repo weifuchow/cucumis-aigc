@@ -37,6 +37,22 @@ export function getMimeType(filePath: string) {
   return "application/octet-stream";
 }
 
+export function getArtifactHref(projectId: string, relativePath: string) {
+  return `/api/projects/${projectId}/artifacts?path=${encodeURIComponent(relativePath)}`;
+}
+
+export function getArtifactKind(filePath: string): "image" | "video" | "json" | "text" | "markdown" | "binary" {
+  const ext = path.extname(filePath).toLowerCase();
+
+  if (IMAGE_EXTENSIONS.has(ext)) return "image";
+  if (VIDEO_EXTENSIONS.has(ext)) return "video";
+  if (ext === ".json") return "json";
+  if (ext === ".md") return "markdown";
+  if (TEXT_EXTENSIONS.has(ext)) return "text";
+
+  return "binary";
+}
+
 export async function readArtifactPreview(projectId: string, relativePath: string): Promise<ArtifactPreview> {
   const { absolutePath } = resolveProjectPath(projectId, relativePath);
   const mimeType = getMimeType(absolutePath);
@@ -47,7 +63,7 @@ export async function readArtifactPreview(projectId: string, relativePath: strin
       type: "image",
       mimeType,
       path: relativePath,
-      href: `/api/projects/${projectId}/artifacts?path=${encodeURIComponent(relativePath)}`,
+      href: getArtifactHref(projectId, relativePath),
     };
   }
 
@@ -56,7 +72,7 @@ export async function readArtifactPreview(projectId: string, relativePath: strin
       type: "video",
       mimeType,
       path: relativePath,
-      href: `/api/projects/${projectId}/artifacts?path=${encodeURIComponent(relativePath)}`,
+      href: getArtifactHref(projectId, relativePath),
     };
   }
 

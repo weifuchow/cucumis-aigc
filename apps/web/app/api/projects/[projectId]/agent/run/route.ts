@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { runCodexProjectAgent } from "@/lib/agent/codex";
 import { runProjectAgent } from "@/lib/agent/session";
 import { getNextRunnableStage, runProjectReview, runStage } from "@/lib/stages/runner";
 import { isStageName } from "@/lib/stages/contracts";
@@ -9,6 +10,7 @@ export const runtime = "nodejs";
 
 const bodySchema = z.object({
   stage: z.string().optional(),
+  action: z.string().optional(),
 });
 
 export async function POST(
@@ -19,6 +21,10 @@ export async function POST(
 
   try {
     const body = bodySchema.parse(await request.json());
+
+    if (body.action && body.action !== "continue_workflow") {
+      return NextResponse.json({ error: `Unsupported action: ${body.action}` }, { status: 400 });
+    }
 
     if (body.stage) {
       if (!isStageName(body.stage)) {
@@ -37,7 +43,7 @@ export async function POST(
     }
 
     const nextStage = await getNextRunnableStage(projectId);
-    const agent = await runProjectAgent({
+    const agent = await runCodexProjectAgent({
       projectId,
       messages: [
         {
@@ -50,7 +56,6 @@ export async function POST(
     return NextResponse.json({
       reply: agent.reply,
       ranStage: nextStage,
-      totalCostUSD: agent.totalCostUSD,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Stage execution failed.";

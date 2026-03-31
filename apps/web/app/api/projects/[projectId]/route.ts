@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getProjectDetail } from "@/lib/projects/store";
+import { getProjectWorkbenchSnapshot } from "@/lib/workbench/projector";
 
 export const runtime = "nodejs";
 
@@ -9,6 +9,6 @@ export async function GET(
   context: { params: Promise<{ projectId: string }> },
 ) {
   const { projectId } = await context.params;
-  const project = await getProjectDetail(projectId);
-  return NextResponse.json({ project });
+  const snapshot = await getProjectWorkbenchSnapshot(projectId);
+  return NextResponse.json(snapshot);
 }
