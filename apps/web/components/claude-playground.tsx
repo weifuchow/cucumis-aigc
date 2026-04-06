@@ -4,16 +4,11 @@ import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+import { useAgentConfig, type AgentProvider, PROVIDER_LABELS } from "@/lib/agent-config";
+
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
-};
-
-type AgentProvider = "claude" | "codex";
-
-const PROVIDER_LABELS: Record<AgentProvider, string> = {
-  claude: "Claude Chat",
-  codex: "Codex Chat",
 };
 
 const INITIAL_MESSAGES: Record<AgentProvider, ChatMessage[]> = {
@@ -34,7 +29,7 @@ const INITIAL_MESSAGES: Record<AgentProvider, ChatMessage[]> = {
 };
 
 export function ClaudePlayground() {
-  const [provider, setProvider] = useState<AgentProvider>("codex");
+  const { provider } = useAgentConfig();
   const [histories, setHistories] = useState<Record<AgentProvider, ChatMessage[]>>(INITIAL_MESSAGES);
   const [drafts, setDrafts] = useState<Record<AgentProvider, string>>({
     claude: "我的电脑还剩多少空间？请直接帮我查。",
@@ -149,17 +144,7 @@ export function ClaudePlayground() {
           <div className="split-header">
             <h2 className="section-title">Agent Chat</h2>
             <div className="pill-row">
-              {(["claude", "codex"] as AgentProvider[]).map((item) => (
-                <button
-                  className="pill"
-                  data-tone={provider === item ? "running" : undefined}
-                  key={item}
-                  onClick={() => setProvider(item)}
-                  type="button"
-                >
-                  {PROVIDER_LABELS[item]}
-                </button>
-              ))}
+              <span className="pill" data-tone="running">{PROVIDER_LABELS[provider]}</span>
               {provider === "claude" && cost !== null ? (
                 <span className="pill">cost: ${cost.toFixed(4)}</span>
               ) : null}
@@ -167,7 +152,7 @@ export function ClaudePlayground() {
             </div>
           </div>
           <p className="muted">
-            默认使用 `Codex`，也可以切换到 `Claude`。两边历史独立，回复按 Markdown 渲染。
+            当前使用全局 Agent：{PROVIDER_LABELS[provider]}。可在顶部导航栏切换。两边历史独立，回复按 Markdown 渲染。
           </p>
           {error ? (
             <div className="status-note" data-tone="error">

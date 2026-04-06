@@ -323,7 +323,7 @@ def main() -> int:
     max_speedup_limit: float = MAX_SPEEDUP
     download_error: str | None = None
     audio_url = audio_result.get("audio_url")
-    if isinstance(audio_url, str) and audio_url.startswith(("http://", "https://")):
+    if isinstance(audio_url, str) and audio_url.startswith(("http://", "https://", "file://")):
         try:
             local_audio_name = f"voiceover-source{_detect_file_suffix(audio_url)}"
             local_audio_path = audio_dir / local_audio_name

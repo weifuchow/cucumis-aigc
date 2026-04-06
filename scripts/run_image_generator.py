@@ -195,7 +195,7 @@ def _save_image_result(
     if is_live:
         images = result.get("images", [])
         url = str(images[0].get("url", "")) if images else ""
-        if not url.startswith(("http://", "https://")):
+        if not url.startswith(("http://", "https://", "file://")):
             raise RuntimeError(f"missing image URL for {label} (scene={scene_id})")
         return download_image(url, output_stem)
     return _write_mock_placeholder(output_stem, label, positive_prompt)
@@ -680,7 +680,7 @@ def _run_legacy_pipeline(args: argparse.Namespace, project_dir: pathlib.Path) ->
             generated = by_prompt_id.get(anchor_id) or by_scene_id.get(anchor_id) or {}
             source_url = str(generated.get("url", "")).strip()
             if mode == "live":
-                if not source_url.startswith(("http://", "https://")):
+                if not source_url.startswith(("http://", "https://", "file://")):
                     print(f"missing baseline image url for {anchor_id}", file=sys.stderr)
                     return 1
                 try:
@@ -753,7 +753,7 @@ def _run_legacy_pipeline(args: argparse.Namespace, project_dir: pathlib.Path) ->
         output_stem = images_dir / scene_id / f"frame-{frame_index:02d}" if frame_count > 1 else images_dir / scene_id
 
         if scene_mode == "live":
-            if not source_url.startswith(("http://", "https://")):
+            if not source_url.startswith(("http://", "https://", "file://")):
                 print(f"missing downloadable image url for {scene_id}", file=sys.stderr)
                 return 1
             try:
@@ -779,7 +779,7 @@ def _run_legacy_pipeline(args: argparse.Namespace, project_dir: pathlib.Path) ->
             retry_by_prompt, retry_by_scene = _build_generated_lookup(retry_result)
             retry_generated = retry_by_prompt.get(prompt_id) or retry_by_scene.get(scene_id) or {}
             retry_url = str(retry_generated.get("url", "")).strip()
-            if retry_url.startswith(("http://", "https://")):
+            if retry_url.startswith(("http://", "https://", "file://")):
                 try:
                     local_asset_path = download_image(retry_url, images_dir / scene_id)
                     request_id = str(retry_generated.get("request_id", retry_result.get("request_id", request_id)))

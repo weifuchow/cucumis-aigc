@@ -873,7 +873,7 @@ def main() -> int:
         if clip.get("source_mode") != "model_generated":
             continue
         url = str(clip.get("url", ""))
-        if not url.startswith(("http://", "https://")):
+        if not url.startswith(("http://", "https://", "file://")):
             print(f"[video] {clip['scene_id']}: no downloadable URL (url={url!r}), skipping download", flush=True)
             continue
         scene_id = str(clip["scene_id"])

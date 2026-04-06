@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { StageTimeline } from "@/components/stage-timeline";
+import { useAgentConfig, type AgentProvider, PROVIDER_LABELS } from "@/lib/agent-config";
 import type { ProjectWorkbenchSnapshot, WorkbenchField, WorkbenchPendingAction } from "@/lib/workbench/types";
 
 type ProjectWorkbenchShellProps = {
@@ -17,16 +18,9 @@ type AgentResponse = {
   error?: string;
 };
 
-type AgentProvider = "claude" | "codex";
-
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
-};
-
-const PROVIDER_LABELS: Record<AgentProvider, string> = {
-  claude: "Claude Code Agent",
-  codex: "Codex Agent",
 };
 
 const INITIAL_HISTORIES: Record<AgentProvider, ChatMessage[]> = {
@@ -155,7 +149,7 @@ function ArtifactPreview({
 
 export function ProjectWorkbenchShell({ initialSnapshot }: ProjectWorkbenchShellProps) {
   const [snapshot, setSnapshot] = useState(initialSnapshot);
-  const [provider, setProvider] = useState<AgentProvider>("codex");
+  const { provider } = useAgentConfig();
   const [histories, setHistories] = useState<Record<AgentProvider, ChatMessage[]>>(INITIAL_HISTORIES);
   const [drafts, setDrafts] = useState<Record<AgentProvider, string>>({
     claude: "总结当前结果，并告诉我是否适合继续执行。",
@@ -575,17 +569,7 @@ export function ProjectWorkbenchShell({ initialSnapshot }: ProjectWorkbenchShell
                   <div className="split-header">
                     <h3 className="section-title">项目 Agent</h3>
                     <div className="pill-row">
-                      {(["claude", "codex"] as AgentProvider[]).map((item) => (
-                        <button
-                          className="pill"
-                          data-tone={provider === item ? "running" : undefined}
-                          key={item}
-                          onClick={() => setProvider(item)}
-                          type="button"
-                        >
-                          {PROVIDER_LABELS[item]}
-                        </button>
-                      ))}
+                      <span className="pill" data-tone="running">{PROVIDER_LABELS[provider]}</span>
                     </div>
                   </div>
                   <div className="panel agent-chat-panel">
