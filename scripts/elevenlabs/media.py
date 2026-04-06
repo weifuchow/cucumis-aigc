@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import tempfile
+from pathlib import Path
 from typing import Any
 
 from .client import ElevenLabsConfig, request_binary
@@ -28,6 +29,76 @@ LANG_VOICE_MAP = {
 def _stable_id(prefix: str, key: str) -> str:
     digest = hashlib.sha1(key.encode("utf-8")).hexdigest()[:12]
     return f"{prefix}-{digest}"
+
+
+def generate_sound_effect(
+    config: ElevenLabsConfig,
+    text: str,
+    duration_seconds: float | None = None,
+    prompt_influence: float = 0.3,
+    output_path: Path | None = None,
+) -> dict[str, Any]:
+    """Generate BGM / sound effect via ElevenLabs Sound Generation API.
+
+    Endpoint: POST /v1/sound-generation
+    - text: English description recommended, max 500 chars
+    - duration_seconds: optional, max 22.0; omit to let ElevenLabs auto-determine
+    - prompt_influence: 0.0–1.0, how closely to follow the text (default 0.3)
+
+    Returns dict with keys: mode, model, request_id, audio_url (file://...), usage
+    """
+    if not config.api_key:
+        # Mock mode: write silence placeholder
+        if output_path:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            # Write a minimal valid file marker (not real audio, for mock only)
+            output_path.write_bytes(b"")
+        return {
+            "mode": "mock",
+            "model": "elevenlabs-sound-generation",
+            "request_id": _stable_id("sfx", text),
+            "audio_url": f"file://{output_path}" if output_path else None,
+            "duration_seconds": duration_seconds,
+            "raw_response": {"provider": "elevenlabs", "mode": "mock"},
+            "usage": {"cost_points": 0, "mode": "mock"},
+        }
+
+    payload: dict[str, Any] = {
+        "text": text[:500],
+        "prompt_influence": prompt_influence,
+    }
+    if duration_seconds is not None:
+        payload["duration_seconds"] = min(float(duration_seconds), 22.0)
+
+    print(
+        f"[elevenlabs] sound-generation len={len(text)} dur={duration_seconds}s",
+        flush=True,
+    )
+    audio_bytes = request_binary(config, "POST", "/sound-generation", payload=payload)
+
+    dest = output_path or Path(
+        tempfile.NamedTemporaryFile(
+            delete=False, suffix=".mp3", prefix="cucumis-el-sfx-"
+        ).name
+    )
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(audio_bytes)
+    audio_url = f"file://{dest}"
+    print(f"[elevenlabs] sound saved → {audio_url}", flush=True)
+
+    return {
+        "mode": "live",
+        "model": "elevenlabs-sound-generation",
+        "request_id": _stable_id("sfx", text),
+        "audio_url": audio_url,
+        "duration_seconds": duration_seconds,
+        "raw_response": {"provider": "elevenlabs", "bytes": len(audio_bytes)},
+        "usage": {
+            "cost_points": len(text),
+            "mode": "live",
+            "note": "ElevenLabs sound generation charges per character",
+        },
+    }
 
 
 def generate_tts(

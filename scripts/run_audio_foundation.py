@@ -11,11 +11,41 @@ import subprocess
 import urllib.request
 from urllib.parse import urlparse
 
+import sys
+
 from poe.client import PoeConfig, load_poe_config
 from poe.media import generate_audio
 from poe.usage import append_cost_event, write_usage_json
 
 MAX_SPEEDUP = 1.2
+
+# ElevenLabs Sound Generation: max 22s per call
+_EL_MAX_DURATION = 22.0
+
+# BGM segment descriptions (English) — keyed by segment label for reuse.
+# When bgm-selection.json has an "en_description" field on each segment, that
+# takes precedence.  This dict acts as a fallback for well-known labels.
+_BGM_LABEL_EN: dict[str, str] = {
+    "创伤起点": (
+        "dark orchestral music with low strings and cello, heavy oppressive atmosphere, "
+        "occasional distant dragon roar, building sorrow and rage, cinematic epic fantasy"
+    ),
+    "淬炼执念": (
+        "cold mechanical percussion repeating steadily, obsessive driving rhythm, "
+        "then sudden brass and percussion explosion followed by complete silence, "
+        "epic dark fantasy cinematic"
+    ),
+    "加冕异化": (
+        "ironic epic choir and brass fanfare with underlying ominous low frequency drone, "
+        "then drop to single sustained low note, followed by slow oppressive string march, "
+        "dark cinematic power theme"
+    ),
+    "宿命落地": (
+        "tragic string variation of opening theme in minor key, cyclical and inevitable, "
+        "gradually fading all instruments to single low cello note then silence, "
+        "dark epic fate motif"
+    ),
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -265,6 +295,99 @@ def time_fit_audio_to_duration(
     return True, output_duration, applied_speed_ratio
 
 
+def _concat_audio_files(segment_paths: list[pathlib.Path], output_path: pathlib.Path) -> bool:
+    """Concatenate multiple audio files into one using ffmpeg concat demuxer."""
+    if not shutil.which("ffmpeg"):
+        return False
+    list_file = output_path.parent / "_concat_list.txt"
+    list_file.write_text(
+        "\n".join(f"file '{p.resolve()}'" for p in segment_paths),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        ["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file), "-c", "copy", str(output_path)],
+        capture_output=True,
+        text=True,
+    )
+    list_file.unlink(missing_ok=True)
+    return result.returncode == 0 and output_path.is_file()
+
+
+def generate_bgm_audio(
+    bgm_selection: dict,
+    audio_dir: pathlib.Path,
+    project_dir: pathlib.Path,
+) -> tuple[str | None, list[dict]]:
+    """Generate BGM audio from bgm-selection.json segments via ElevenLabs Sound Generation.
+
+    Returns (bgm_audio_relpath, updated_segments_list).
+    Falls back to mock mode if ELEVENLABS_API_KEY is absent.
+    """
+    # Import here to keep top-level imports minimal
+    sys_path_insert = str(pathlib.Path(__file__).resolve().parent)
+    if sys_path_insert not in sys.path:
+        sys.path.insert(0, sys_path_insert)
+
+    from elevenlabs.client import load_elevenlabs_config
+    from elevenlabs.media import generate_sound_effect
+
+    # 优先用项目目录的 .env，不存在则 fallback 到 repo root .env
+    project_env = project_dir / ".env"
+    repo_env = pathlib.Path(__file__).resolve().parent.parent / ".env"
+    env_path = project_env if project_env.is_file() else (repo_env if repo_env.is_file() else None)
+    el_config = load_elevenlabs_config(env_path=env_path)
+
+    segments = bgm_selection.get("segments", [])
+    segment_paths: list[pathlib.Path] = []
+    updated_segments: list[dict] = []
+
+    for seg in segments:
+        seg_id = seg.get("segment_id", f"bgm-seg-{len(segment_paths)+1}")
+        label = seg.get("label", "")
+        duration = float(seg.get("end", 0)) - float(seg.get("start", 0))
+        duration = min(duration, _EL_MAX_DURATION)
+
+        # Prefer explicit en_description, fall back to label map, then instrumentation
+        en_desc = (
+            seg.get("en_description")
+            or _BGM_LABEL_EN.get(label)
+            or seg.get("instrumentation", label)
+        )
+
+        out_path = audio_dir / f"bgm-{seg_id}.mp3"
+        result = generate_sound_effect(
+            el_config,
+            text=en_desc,
+            duration_seconds=duration,
+            output_path=out_path,
+        )
+
+        seg_copy = dict(seg)
+        seg_copy["audio_path"] = str(out_path.relative_to(project_dir)) if out_path.exists() else None
+        seg_copy["audio_url"] = result.get("audio_url")
+        seg_copy["generation_mode"] = result.get("mode", "unknown")
+        seg_copy["en_description"] = en_desc
+        updated_segments.append(seg_copy)
+
+        if out_path.exists() and out_path.stat().st_size > 0:
+            segment_paths.append(out_path)
+
+    if not segment_paths:
+        return None, updated_segments
+
+    # Concatenate all segments into single BGM file
+    bgm_final = audio_dir / "bgm-main.mp3"
+    if len(segment_paths) == 1:
+        import shutil as _shutil
+        _shutil.copy2(segment_paths[0], bgm_final)
+    else:
+        ok = _concat_audio_files(segment_paths, bgm_final)
+        if not ok:
+            return None, updated_segments
+
+    return str(bgm_final.relative_to(project_dir)), updated_segments
+
+
 def main() -> int:
     args = parse_args()
     project_dir = pathlib.Path(args.project).resolve()
@@ -275,6 +398,51 @@ def main() -> int:
     config = load_poe_config(env_path=project_env if project_env.is_file() else None)
     audio_dir = project_dir / "audio"
     audio_dir.mkdir(parents=True, exist_ok=True)
+
+    requires_voiceover = bool(task_input.get("requires_voiceover", True))
+
+    # ── BGM-only path (no voiceover) ─────────────────────────────────────────
+    if not requires_voiceover:
+        # Load or build bgm-selection from existing file (written by creative_design)
+        bgm_path = audio_dir / "bgm-selection.json"
+        if bgm_path.is_file():
+            bgm_selection = json.loads(bgm_path.read_text(encoding="utf-8"))
+        else:
+            bgm_selection = {
+                "track_id": "bgm-auto-001",
+                "total_duration_seconds": task_input.get("duration_seconds", 60),
+                "segments": [],
+            }
+
+        bgm_relpath, updated_segments = generate_bgm_audio(bgm_selection, audio_dir, project_dir)
+        bgm_selection["segments"] = updated_segments
+        if bgm_relpath:
+            bgm_selection["audio_path"] = bgm_relpath
+
+        voiceover = {
+            "segments": [],
+            "target_duration_seconds": int(task_input.get("duration_seconds", 60)),
+            "actual_duration_seconds": 0,
+            "requires_voiceover": False,
+            "note": "No voiceover. BGM generated via ElevenLabs Sound Generation.",
+            "source_url": None,
+            "source_path": None,
+            "generation_error": None,
+        }
+
+        (audio_dir / "voiceover.json").write_text(
+            json.dumps(voiceover, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        (audio_dir / "bgm-selection.json").write_text(
+            json.dumps(bgm_selection, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        (audio_dir / "voiceover.prompt.txt").write_text(
+            "[No voiceover — BGM only]\n", encoding="utf-8"
+        )
+
+        print(audio_dir)
+        return 0
+    # ── End BGM-only path ─────────────────────────────────────────────────────
 
     raw_track = script.get("audio_track", [])
     script_lines = []

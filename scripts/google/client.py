@@ -5,6 +5,7 @@ import os
 import time
 import urllib.request
 import urllib.error
+import urllib.error
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -60,18 +61,36 @@ def request_json(
     path: str,
     payload: dict[str, Any] | None = None,
     timeout: int = 120,
+    _retry_codes: tuple[int, ...] = (429, 503),
 ) -> dict[str, Any]:
-    """Make a JSON request to the Google AI API."""
+    """Make a JSON request to the Google AI API. Retries on 429/503 with backoff."""
     url = f"{config.base_url}{path}?key={config.api_key}"
     data = json.dumps(payload).encode("utf-8") if payload else None
     headers = {"Content-Type": "application/json"}
-    req = urllib.request.Request(url, data=data, headers=headers, method=method)
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"[google] HTTP {exc.code} {path}: {body}") from exc
+    last_exc: Exception | None = None
+    for attempt in range(1, 5):
+        req = urllib.request.Request(url, data=data, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            if exc.code in _retry_codes and attempt < 4:
+                wait = attempt * 15
+                print(f"[google] HTTP {exc.code} — retrying in {wait}s (attempt {attempt}/3)…", flush=True)
+                time.sleep(wait)
+                last_exc = exc
+                continue
+            raise RuntimeError(f"[google] HTTP {exc.code} {path}: {body}") from exc
+        except Exception as exc:
+            if attempt < 4:
+                wait = attempt * 15
+                print(f"[google] request error ({exc}) — retrying in {wait}s (attempt {attempt}/3)…", flush=True)
+                time.sleep(wait)
+                last_exc = exc
+                continue
+            raise
+    raise RuntimeError(f"[google] all retries failed for {path}") from last_exc
 
 
 def poll_operation(

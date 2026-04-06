@@ -192,6 +192,10 @@ def _save_image_result(
     positive_prompt: str,
 ) -> pathlib.Path:
     """Download or create placeholder for a generated image. Returns local path."""
+    # Always write a companion .prompt.txt so we can inspect what was sent
+    prompt_file = output_stem.with_suffix(".prompt.txt")
+    prompt_file.parent.mkdir(parents=True, exist_ok=True)
+    prompt_file.write_text(positive_prompt, encoding="utf-8")
     if is_live:
         images = result.get("images", [])
         url = str(images[0].get("url", "")) if images else ""
@@ -272,6 +276,8 @@ def _phase1_characters(
             total_cost += normalize_cost((result.get("usage") or {}).get("cost_points") or (result.get("usage") or {}).get("credits"))
             is_live = result.get("mode") == "live"
             local_path = _save_image_result(result, view_id, output_stem, is_live, f"char:{char_id}/{view_type}", positive_prompt)
+            if is_live:
+                time.sleep(8)  # rate-limit: avoid back-to-back QPM exhaustion
             entries.append({
                 "char_id": char_id,
                 "view_id": view_id,

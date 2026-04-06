@@ -138,52 +138,92 @@ def generate_image(
     images: list[dict[str, Any]] = []
     request_ids: list[str] = []
 
+    # Detect Imagen models (use :predict endpoint, different payload/response)
+    _is_imagen = model.startswith("imagen-")
+
     for item in prompts:
         scene_id = str(item.get("scene_id", "scene"))
         prompt_id = str(item.get("prompt_id", ""))
         positive_prompt = item.get("positive_prompt", "")
         aspect_ratio = item.get("aspect_ratio", "9:16")
 
-        # Build content parts — reference images first
-        content_parts: list[dict[str, Any]] = []
-        for ref in (item.get("_ref_images") or [])[:4]:
-            encoded = _encode_image(str(ref.get("path", "") if isinstance(ref, dict) else ref))
-            if encoded:
-                b64, mime = encoded
-                content_parts.append({"inlineData": {"mimeType": mime, "data": b64}})
-        content_parts.append({"text": positive_prompt})
-
-        payload: dict[str, Any] = {
-            "contents": [{"role": "user", "parts": content_parts}],
-            "generationConfig": {
-                "responseModalities": ["TEXT", "IMAGE"],
-                # numberOfImages belongs to Imagen API, not Gemini generateContent
-            },
-        }
-
         print(f"[google] generating image for scene={scene_id} model={model}", flush=True)
-        response = request_json(
-            config, "POST", f"/models/{model}:generateContent", payload=payload, timeout=180
-        )
-
-        image_url = ""
         request_id = _stable_id("image", f"{model}:{positive_prompt}")
+        image_url = ""
 
-        for candidate in response.get("candidates", []):
-            for part in candidate.get("content", {}).get("parts", []):
-                if "inlineData" in part:
-                    b64 = part["inlineData"].get("data", "")
-                    mime = part["inlineData"].get("mimeType", "image/png")
-                    if b64:
-                        image_url = _save_inline_image(b64, mime)
-                        print(f"[google] image saved → {image_url}", flush=True)
+        if _is_imagen:
+            # Imagen 4 API: POST /models/{model}:predict
+            payload: dict[str, Any] = {
+                "instances": [{"prompt": positive_prompt}],
+                "parameters": {
+                    "sampleCount": 1,
+                    "aspectRatio": aspect_ratio,
+                },
+            }
+            # Inject reference image if available
+            ref_images = item.get("_ref_images") or []
+            if ref_images:
+                encoded = _encode_image(str(ref_images[0].get("path", "") if isinstance(ref_images[0], dict) else ref_images[0]))
+                if encoded:
+                    b64, mime = encoded
+                    payload["instances"][0]["referenceImages"] = [
+                        {"referenceType": "REFERENCE_TYPE_SUBJECT", "referenceImage": {"bytesBase64Encoded": b64, "mimeType": mime}}
+                    ]
+
+            response = request_json(
+                config, "POST", f"/models/{model}:predict", payload=payload, timeout=180
+            )
+            for pred in response.get("predictions", []):
+                b64 = pred.get("bytesBase64Encoded", "")
+                mime = pred.get("mimeType", "image/png")
+                if b64:
+                    image_url = _save_inline_image(b64, mime)
+                    print(f"[google] image saved → {image_url}", flush=True)
+                    break
+        else:
+            # Gemini image generation: POST /models/{model}:generateContent
+            # Retry up to 3 times with back-off — rate limits cause intermittent empty responses
+            import time as _time
+            for attempt in range(1, 4):
+                if attempt > 1:
+                    wait = attempt * 10
+                    print(f"[google] waiting {wait}s before retry (attempt {attempt})…", flush=True)
+                    _time.sleep(wait)
+                content_parts: list[dict[str, Any]] = []
+                for ref in (item.get("_ref_images") or [])[:4]:
+                    encoded = _encode_image(str(ref.get("path", "") if isinstance(ref, dict) else ref))
+                    if encoded:
+                        b64, mime = encoded
+                        content_parts.append({"inlineData": {"mimeType": mime, "data": b64}})
+                content_parts.append({"text": positive_prompt})
+
+                payload = {
+                    "contents": [{"role": "user", "parts": content_parts}],
+                    "generationConfig": {
+                        "responseModalities": ["TEXT", "IMAGE"],
+                    },
+                }
+                response = request_json(
+                    config, "POST", f"/models/{model}:generateContent", payload=payload, timeout=300
+                )
+                for candidate in response.get("candidates", []):
+                    for part in candidate.get("content", {}).get("parts", []):
+                        if "inlineData" in part:
+                            b64 = part["inlineData"].get("data", "")
+                            mime = part["inlineData"].get("mimeType", "image/png")
+                            if b64:
+                                image_url = _save_inline_image(b64, mime)
+                                print(f"[google] image saved → {image_url}", flush=True)
+                                break
+                        if "text" in part:
+                            urls = _extract_http_urls(part["text"])
+                            if urls:
+                                image_url = urls[0]
+                    if image_url:
                         break
-                if "text" in part:
-                    urls = _extract_http_urls(part["text"])
-                    if urls:
-                        image_url = urls[0]
-            if image_url:
-                break
+                if image_url:
+                    break
+                print(f"[google] attempt {attempt} returned no image, retrying…", flush=True)
 
         request_ids.append(request_id)
         images.append({
@@ -194,6 +234,10 @@ def generate_image(
             "aspect_ratio": aspect_ratio,
             "request_id": request_id,
         })
+        # Rate-limit: avoid hitting QPM limits on Gemini image models
+        if not _is_imagen and len(prompts) > 1:
+            import time as _time
+            _time.sleep(5)
 
     return {
         "mode": "live",
