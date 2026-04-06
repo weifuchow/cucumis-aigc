@@ -759,12 +759,11 @@ def main() -> int:
                 task_input=task_input,
             )
         else:
-            # Prefer project-local Poe config (projects/<project>/.env) to support per-project keys.
-            project_env = project_dir / ".env"
-            config = load_poe_config(env_path=project_env if project_env.is_file() else None)
-            video_result = generate_video(
-                config=config,
-                model=str(task_input["video_model"]),
+            # Use the active provider's generate_video (supports google/veo, poe, etc.)
+            _video_model = getattr(_provider, "default_video_model", None) or str(task_input["video_model"])
+            print(f"[video] calling provider.generate_video model={_video_model} scenes={[s['scene_id'] for s in dynamic_scenes]}", flush=True)
+            video_result = _provider.generate_video(
+                model=_video_model,
                 scenes=dynamic_scenes,
                 aspect_ratio=str(task_input["aspect_ratio"]),
             )
