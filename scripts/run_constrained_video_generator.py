@@ -423,8 +423,12 @@ def should_use_local_image_clip(scene: dict[str, Any], scene_images: list[dict[s
     return len(scene_images) >= 2
 
 
-def download_video(url: str, output_path: pathlib.Path) -> pathlib.Path:
+def download_video(url: str, output_path: pathlib.Path, api_key: str = "") -> pathlib.Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    # Google AI file download requires the API key as a query parameter
+    if api_key and "generativelanguage.googleapis.com" in url:
+        sep = "&" if "?" in url else "?"
+        url = f"{url}{sep}key={api_key}"
     for attempt in range(1, 4):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept": "video/*,*/*"})
@@ -865,6 +869,8 @@ def main() -> int:
     model_video_dir = video_dir / "model"
     all_request_ids: list[str] = []
     download_errors: list[str] = []
+    # Extract API key for authenticated downloads (e.g. Google AI file URLs)
+    _dl_api_key = getattr(getattr(_provider if dynamic_scenes else None, "config", None), "api_key", "") or ""
     for clip in merged_clips:
         rid = clip.get("request_id")
         if isinstance(rid, str) and rid and rid not in all_request_ids:
@@ -879,7 +885,7 @@ def main() -> int:
         output_stem = model_video_dir / scene_id
         print(f"[video] downloading {scene_id} from {url} ...", flush=True)
         try:
-            local_path = download_video(url, output_stem)
+            local_path = download_video(url, output_stem, api_key=_dl_api_key)
             clip["url"] = str(local_path.relative_to(project_dir))
             clip["local_path"] = clip["url"]
             print(f"[video] saved {scene_id} → {clip['url']} ({local_path.stat().st_size // 1024}KB)", flush=True)

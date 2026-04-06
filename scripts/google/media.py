@@ -320,9 +320,10 @@ def generate_video(
                 b64, mime = encoded
                 instance["image"] = {"bytesBase64Encoded": b64, "mimeType": mime}
 
-        # Last frame: all Veo models support lastFrame for continuity control.
-        # Veo 3.1 (non-Lite) additionally uses it for subject/character consistency.
-        if len(ref_images) >= 2:
+        # Last frame: only supported by veo-3.1-generate-preview (non-Lite).
+        # veo-3.1-lite-generate-preview does NOT support lastFrame.
+        _is_lite = "lite" in model.lower()
+        if len(ref_images) >= 2 and not _is_lite:
             last_ref = ref_images[1]
             path = str(last_ref.get("path", "") if isinstance(last_ref, dict) else last_ref)
             encoded = _encode_image(path)

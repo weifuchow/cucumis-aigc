@@ -288,7 +288,7 @@ def run_ffmpeg_export(
         for i in range(n):
             filter_parts.append(
                 f"[{i}:v]scale=720:1280:force_original_aspect_ratio=decrease,"
-                f"pad=720:1280:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p[v{i}]"
+                f"pad=720:1280:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p,setsar=1[v{i}]"
             )
         concat_inputs = "".join(f"[v{i}]" for i in range(n))
         # concat only; subtitles are burned in a separate pass to avoid filter_complex escaping issues
