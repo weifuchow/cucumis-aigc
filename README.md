@@ -10,13 +10,61 @@
 
 除了现有“生成型视频主链”，仓库现在也支持一条更轻的 `material_editorial` 前置编导链，适合用户直接给一个杂乱素材文件夹，由 agent 先做素材理解、关系串联、分镜草案和调整方案，再进入音频与时间轴阶段。
 
+适用场景：
+
+- 用户给的是一个素材文件夹，不是完整脚本
+- 素材没有分类，且横竖版、图片、视频、文档可能混杂
+- 需要先做素材理解、风格统一、关系串联和补素材建议
+- 关键步骤必须人工确认，避免直接生成废片
+
+当前已经落地的阶段：
+
+- `material_ingest`
+- `material_batch_understanding`
+- `review / observe / session_handoff`
+
+这条链的控制面文件在：
+
+- `orchestration/task-card.md`
+- `orchestration/state.json`
+- `orchestration/checkpoints.json`
+- `orchestration/subtasks.json`
+- `orchestration/context-index.json`
+
 最小命令：
 
 ```bash
+# 新建项目
+python3 scripts/init_project.py --project-name <name>
+
+# 扫描素材目录，切成可恢复的 batch
 python3 scripts/run_material_ingest.py --project <name> --source-dir /path/to/materials
+
+# 逐 batch 生成素材摘要、关系草稿和风格摘要
 python3 scripts/run_material_batch_understanding.py --project <name> --all-pending
+
+# 诊断与续跑
+python3 scripts/review_project.py --project <name>
+python3 scripts/observe_project.py --project <name>
 python3 scripts/session_handoff.py --project projects/<name>
 ```
+
+关键产物：
+
+- `assets/source-manifest.json`
+- `analysis/batches/*.manifest.json`
+- `analysis/batches/*.catalog.json`
+- `analysis/batches/*.relationships.json`
+- `analysis/material-catalog.json`
+- `analysis/relationship-graph.json`
+- `analysis/style-report.json`
+
+恢复规则：
+
+- 主线程只读控制面文件和汇总文件，不回读全量素材
+- 未完成 batch 只看 `orchestration/subtasks.json` 里的 `pending/failed`
+- 新线程续跑时优先读取 `orchestration/session-handoff.md`
+- 用户修改创意方向时，应只让受影响摘要失效，不全量重做
 
 相关 workflow 与 skills：
 
@@ -186,7 +234,7 @@ cucumis-aigc/
 echo "POE_API_KEY=your-key" > .env
 
 # 新建项目
-python3 scripts/init_project.py --request "60秒KOF大蛇封印史诗预告"
+python3 scripts/init_project.py --project-name <name>
 
 # 逐阶段执行
 python3 scripts/run_creative_design.py --project <name>
