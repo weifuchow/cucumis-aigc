@@ -31,6 +31,27 @@
     },
     "next_stage": {
       "type": ["string", "null"]
+    },
+    "workflow": {
+      "type": ["string", "null"]
+    },
+    "phase": {
+      "type": ["string", "null"]
+    },
+    "checkpoint_status": {
+      "type": ["string", "null"]
+    },
+    "active_batch_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "resume_from": {
+      "type": ["string", "null"]
+    },
+    "last_handoff_path": {
+      "type": ["string", "null"]
     }
   }
 }

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Material Editorial Checkpoints",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workflow",
+    "updated_at",
+    "items"
+  ],
+  "properties": {
+    "workflow": {
+      "type": "string",
+      "minLength": 1
+    },
+    "updated_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "generated_at": "",
+  "source_root": "",
+  "scan": {
+    "recursive": true,
+    "batch_size": 24,
+    "total_assets": 0,
+    "total_batches": 0
+  },
+  "assets": []
+}

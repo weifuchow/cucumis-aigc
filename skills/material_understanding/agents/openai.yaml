@@ -1,0 +1,4 @@
+interface:
+  display_name: "Material Understanding"
+  short_description: "Summarize one or more material batches into catalog and relationship drafts"
+  default_prompt: "Use material_understanding to process batch manifests and consolidate material-catalog and relationship-graph outputs."

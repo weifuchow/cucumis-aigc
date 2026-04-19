@@ -1,0 +1,4 @@
+interface:
+  display_name: "Editorial Orchestrator"
+  short_description: "Run the resumable material editorial workflow with checkpoints and compact context"
+  default_prompt: "Use editorial_orchestrator to manage a resumable material_editorial workflow over messy user-provided folders."

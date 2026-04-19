@@ -1,0 +1,4 @@
+interface:
+  display_name: "Relationship Mapper"
+  short_description: "Refine cross-material relationships before storyboard planning"
+  default_prompt: "Use relationship_mapper to refine timeline,人物,地点 and event relationships from the consolidated material catalog."

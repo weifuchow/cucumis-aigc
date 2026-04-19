@@ -1,0 +1,4 @@
+interface:
+  display_name: "Material Ingest"
+  short_description: "Scan a raw material folder and create resumable batch manifests"
+  default_prompt: "Use material_ingest to index a raw user folder into source-manifest and batch manifests."

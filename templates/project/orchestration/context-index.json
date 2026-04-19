@@ -1,0 +1,11 @@
+{
+  "workflow": "material_editorial",
+  "generated_at": "",
+  "control_files": [],
+  "summary_files": [],
+  "evidence_files": [],
+  "handoff_files": [
+    "orchestration/session-handoff.md"
+  ],
+  "active_context": []
+}

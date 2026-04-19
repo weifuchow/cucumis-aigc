@@ -1,0 +1,4 @@
+interface:
+  display_name: "Adjustment Planner"
+  short_description: "Plan shot-level filters, edits, pickups, and prompt logging"
+  default_prompt: "Use adjustment_planner to turn a storyboard draft into a confirmed shot-level adjustment plan."

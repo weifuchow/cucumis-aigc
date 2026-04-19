@@ -3,5 +3,11 @@
   "completed_stages": [],
   "skipped_stages": [],
   "last_failed_stage": null,
-  "next_stage": null
+  "next_stage": null,
+  "workflow": "video_pipeline",
+  "phase": null,
+  "checkpoint_status": null,
+  "active_batch_ids": [],
+  "resume_from": null,
+  "last_handoff_path": "orchestration/session-handoff.md"
 }

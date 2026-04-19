@@ -6,6 +6,27 @@
 
 启动说明见 `apps/web/README.md`。
 
+## Material Editorial Workflow
+
+除了现有“生成型视频主链”，仓库现在也支持一条更轻的 `material_editorial` 前置编导链，适合用户直接给一个杂乱素材文件夹，由 agent 先做素材理解、关系串联、分镜草案和调整方案，再进入音频与时间轴阶段。
+
+最小命令：
+
+```bash
+python3 scripts/run_material_ingest.py --project <name> --source-dir /path/to/materials
+python3 scripts/run_material_batch_understanding.py --project <name> --all-pending
+python3 scripts/session_handoff.py --project projects/<name>
+```
+
+相关 workflow 与 skills：
+
+- `workflows/material_editorial/`
+- `skills/editorial_orchestrator/`
+- `skills/material_ingest/`
+- `skills/material_understanding/`
+- `skills/relationship_mapper/`
+- `skills/adjustment_planner/`
+
 ## Skill Shortcuts
 
 仓库原生 skills 仍然放在 `skills/`。如果你希望同一份 skills 同时被 Claude Agent SDK 和 Codex 发现，执行：
