@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Provider name → module-level factory function
 _REGISTRY: dict[str, str] = {
+    "codex": "providers.codex:make_codex_provider",
     "poe": "providers.poe:make_poe_provider",
     "vidu": "providers.vidu:make_vidu_provider",
     "vidu_web": "providers.vidu_web:make_vidu_web_provider",
@@ -42,18 +43,18 @@ def load_provider(
       2. OS environment variables
       3. ``.env`` file at repo root
 
-    Supported values: ``poe``, ``vidu``, ``vidu_web`` (default)
+    Supported values: ``poe``, ``vidu``, ``vidu_web``, ``codex`` (default)
 
     Example .env::
 
-        MEDIA_PROVIDER=vidu_web
+        MEDIA_PROVIDER=codex
     """
     env_values = dict(_read_dotenv(env_path or REPO_ROOT / ".env"))
     env_values.update(os.environ)
     if env:
         env_values.update(env)
 
-    provider_name = env_values.get("MEDIA_PROVIDER", "vidu_web").strip().lower()
+    provider_name = env_values.get("MEDIA_PROVIDER", "codex").strip().lower()
 
     entry = _REGISTRY.get(provider_name)
     if entry is None:

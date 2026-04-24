@@ -15,7 +15,7 @@
   "pacing_preference": "",
   "audio_mode": "single_narration",
   "audio_model": "elevenlabs-v3",
-  "image_model": "flux-schnell",
+  "image_model": "image-2.0",
   "video_model": "veo-3.1-fast",
   "requires_voiceover": true,
   "requires_subtitles": true,

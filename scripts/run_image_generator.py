@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
+import shutil
 import sys
 import time
 import urllib.parse
@@ -84,6 +85,25 @@ def _file_ext_from_response(url: str, content_type: str) -> str:
 
 
 def download_image(url: str, output_stem: pathlib.Path) -> pathlib.Path:
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme == "file":
+        source_path = pathlib.Path(urllib.request.url2pathname(parsed.path))
+        if not source_path.is_file():
+            raise FileNotFoundError(f"missing local image file: {source_path}")
+        suffix = source_path.suffix.lower() or ".png"
+        output_path = output_stem.with_suffix(".jpg" if suffix == ".jpeg" else suffix)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, output_path)
+        return output_path
+
+    if parsed.scheme == "" and pathlib.Path(url).is_file():
+        source_path = pathlib.Path(url)
+        suffix = source_path.suffix.lower() or ".png"
+        output_path = output_stem.with_suffix(".jpg" if suffix == ".jpeg" else suffix)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, output_path)
+        return output_path
+
     last_error: Exception | None = None
     data = b""
     content_type = ""
@@ -535,7 +555,7 @@ def _run_phased_pipeline(args: argparse.Namespace, project_dir: pathlib.Path, as
         print(str(exc), file=sys.stderr)
         return 1
 
-    image_model = str(task_input.get("image_model", "viduq2"))
+    image_model = str(task_input.get("image_model", "image-2.0"))
     provider = load_provider()
     char_paths: dict[str, list[dict[str, Any]]] = {}
     loc_paths: dict[str, dict[str, Any]] = {}
@@ -645,7 +665,7 @@ def _run_legacy_pipeline(args: argparse.Namespace, project_dir: pathlib.Path) ->
     consistency_override = _load_consistency_profile_override(project_dir)
     profile = _build_consistency_profile(task_input, script_payload, prompts, override=consistency_override)
     default_aspect_ratio = str(task_input.get("aspect_ratio", "9:16"))
-    image_model = str(task_input.get("image_model", "flux-schnell"))
+    image_model = str(task_input.get("image_model", "image-2.0"))
 
     images_dir = project_dir / "assets" / "images"
     baseline_dir = images_dir / "baselines"

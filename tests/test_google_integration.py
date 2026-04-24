@@ -14,8 +14,10 @@ import argparse
 import os
 import pathlib
 import sys
+import tempfile
 import time
 import unittest
+from unittest import mock
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
@@ -24,8 +26,10 @@ from google.client import GoogleConfig, load_google_config
 from google.media import generate_image, generate_video, generate_audio
 from elevenlabs.client import ElevenLabsConfig, load_elevenlabs_config
 from elevenlabs.media import generate_tts
+from providers.codex import make_codex_provider
 from providers.google import make_google_provider
 from providers.factory import load_provider
+from run_image_generator import download_image
 
 
 # ---------------------------------------------------------------------------
@@ -132,6 +136,131 @@ class TestGoogleMockMode(unittest.TestCase):
     def test_provider_factory_registers_elevenlabs(self) -> None:
         provider = load_provider(env={"MEDIA_PROVIDER": "elevenlabs", "ELEVENLABS_API_KEY": ""})
         self.assertEqual(type(provider).__name__, "ElevenLabsProvider")
+
+    def test_provider_factory_registers_codex(self) -> None:
+        provider = load_provider(env={"MEDIA_PROVIDER": "codex", "CODEX_IMAGE_MODEL": "image-2.0"})
+        self.assertEqual(type(provider).__name__, "CodexProvider")
+
+    def test_provider_factory_defaults_to_codex(self) -> None:
+        with mock.patch.dict(os.environ, {"PATH": os.environ.get("PATH", "")}, clear=True):
+            provider = load_provider(env={"CODEX_IMAGE_MODEL": "image-2.0"}, env_path=pathlib.Path("/nonexistent/.env"))
+        self.assertEqual(type(provider).__name__, "CodexProvider")
+
+    def test_codex_provider_generate_image_via_interface(self) -> None:
+        provider = make_codex_provider(env={"CODEX_IMAGE_MODEL": "image-2.0"})
+
+        with tempfile.TemporaryDirectory() as tmp:
+            generated = pathlib.Path(tmp) / "codex-scene-1.png"
+            generated.write_bytes(b"fake-image")
+
+            completed = mock.Mock()
+            completed.stdout = f"{generated}\n"
+
+            with mock.patch("providers.codex.subprocess.run", return_value=completed) as run_mock:
+                result = provider.generate_image(
+                    provider.default_image_model,
+                    [{"scene_id": "scene-1", "prompt_id": "p1", "positive_prompt": "test prompt"}],
+                )
+
+        self.assertEqual(result["mode"], "live")
+        self.assertEqual(result["model"], "image-2.0")
+        self.assertEqual(result["images"][0]["scene_id"], "scene-1")
+        self.assertTrue(result["images"][0]["url"].startswith("file://"))
+        self.assertEqual(result["images"][0]["prompt_id"], "p1")
+        self.assertIn("codex exec", result["raw_response"]["command"])
+        run_mock.assert_called_once()
+
+    def test_codex_provider_passes_reference_images_to_cli(self) -> None:
+        provider = make_codex_provider(env={"CODEX_IMAGE_MODEL": "image-2.0"})
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = pathlib.Path(tmp)
+            generated = tmp_path / "codex-scene-2.png"
+            generated.write_bytes(b"fake-image")
+            ref_image = tmp_path / "ref-1.png"
+            ref_image.write_bytes(b"fake-ref")
+
+            completed = mock.Mock()
+            completed.stdout = f"{generated}\n"
+
+            with mock.patch("providers.codex.subprocess.run", return_value=completed) as run_mock:
+                provider.generate_image(
+                    provider.default_image_model,
+                    [
+                        {
+                            "scene_id": "scene-2",
+                            "prompt_id": "p2",
+                            "positive_prompt": "make a portrait",
+                            "_ref_images": [{"path": str(ref_image), "role": "character"}],
+                        }
+                    ],
+                )
+
+        command = run_mock.call_args.args[0]
+        self.assertIn("--image", command)
+        self.assertIn(str(ref_image), command)
+        self.assertIn("Reference images", command[-1])
+
+    def test_codex_provider_includes_reference_roles_in_prompt(self) -> None:
+        provider = make_codex_provider(env={"CODEX_IMAGE_MODEL": "image-2.0"})
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = pathlib.Path(tmp)
+            generated = tmp_path / "codex-scene-3.png"
+            generated.write_bytes(b"fake-image")
+            char_ref = tmp_path / "char.png"
+            char_ref.write_bytes(b"char-ref")
+            style_ref = tmp_path / "style.png"
+            style_ref.write_bytes(b"style-ref")
+
+            completed = mock.Mock()
+            completed.stdout = f"{generated}\n"
+
+            with mock.patch("providers.codex.subprocess.run", return_value=completed) as run_mock:
+                provider.generate_image(
+                    provider.default_image_model,
+                    [
+                        {
+                            "scene_id": "scene-3",
+                            "prompt_id": "p3",
+                            "positive_prompt": "make a cinematic portrait",
+                            "_ref_images": [
+                                {"path": str(char_ref), "role": "character"},
+                                {"path": str(style_ref), "role": "style"},
+                            ],
+                        }
+                    ],
+                )
+
+        prompt = run_mock.call_args.args[0][-1]
+        self.assertIn("character", prompt)
+        self.assertIn("style", prompt)
+        self.assertIn(str(char_ref), prompt)
+        self.assertIn(str(style_ref), prompt)
+        self.assertIn("preserve the subject identity", prompt)
+        self.assertIn("borrow the visual style", prompt)
+
+    def test_download_image_supports_file_url(self) -> None:
+        png_bytes = (
+            b"\x89PNG\r\n\x1a\n"
+            b"\x00\x00\x00\rIHDR"
+            b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00"
+            b"\x90wS\xde"
+            b"\x00\x00\x00\x0cIDATx\x9cc```\x00\x00\x00\x04\x00\x01"
+            b"\x0b\xe7\x02\x9d"
+            b"\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = pathlib.Path(tmp)
+            source = tmp_path / "source.png"
+            source.write_bytes(png_bytes)
+
+            copied = download_image(source.as_uri(), tmp_path / "copied-image")
+
+            self.assertTrue(copied.is_file())
+            self.assertEqual(copied.suffix, ".png")
+            self.assertEqual(copied.read_bytes(), png_bytes)
 
     def test_google_provider_mock_image_via_interface(self) -> None:
         provider = make_google_provider(env={"GOOGLE_AI_API_KEY": "", "ELEVENLABS_API_KEY": ""})
