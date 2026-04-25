@@ -177,6 +177,35 @@ python3 scripts/import_browser_audio_downloads.py \
 8. 运行 `scripts/import_browser_audio_downloads.py` 导入 BGM，并合并 `assets/manifest.json`。
 9. 最后校验本地文件存在、manifest 可解析，并汇总图片/视频/音频数量。
 
+## Downstream Handoff
+
+素材下载完成后，如果用户希望“把素材串成一个具体短片”，不要直接跳到最终 FFmpeg 渲染。先判断项目当前是否已有脚本和分镜：
+
+- 已有 `script/script.json`、`storyboard/storyboard.json`、`timeline/global-timeline.json`：
+  - 进入 `constrained_video_generator`，把本地图片/视频素材分配到 scene，必要时用本地 FFmpeg 做 Ken Burns、crossfade、sequence 等低成本动效。
+  - 然后进入 `timeline_builder`，生成字幕、组装 `timeline/timeline.json`、写 `outputs/render-plan.json`，必要时导出 `outputs/final.mp4`。
+- 只有下载素材、主题和风格，还没有脚本/分镜：
+  - 进入 `editorial_orchestrator` 的 `material_editorial` 工作流。
+  - 先用 `material_ingest` / `material_understanding` 建立素材目录、关系和风格摘要。
+  - 再做 `creative_alignment`、`storyboard_draft`、`adjustment_planning`，确认后才进入 `audio_foundation` 和 `timeline_builder`。
+
+建议下载器完成后写入编排状态，而不是无条件自动渲染：
+
+```bash
+python3 scripts/update_orchestration_state.py \
+  --project projects/<project> \
+  --current-stage stock_asset_curator \
+  --completed-stage stock_asset_curator \
+  --next-stage material_ingest \
+  --workflow-state material_editorial \
+  --phase asset_handoff \
+  --resume-from assets/manifest.json \
+  --decision-type asset_download_completed \
+  --decision-reason "Stock assets downloaded and ready for material editorial handoff."
+```
+
+如果项目已经有完整分镜，则把 `--next-stage` 改为 `constrained_video_generator`。
+
 ## Runtime Expectations
 
 - 只使用官方 API 或用户确认的素材 URL
