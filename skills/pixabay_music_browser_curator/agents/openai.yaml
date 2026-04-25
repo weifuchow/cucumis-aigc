@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pixabay Music Browser Curator"
+  short_description: "Use the browser to curate and import Pixabay Music BGM by scene mood"
+  default_prompt: "Use pixabay_music_browser_curator to find suitable Pixabay Music BGM for scene descriptions, confirm or batch-download approved choices, write browser-audio-tracks.json, and import downloaded files into the project manifest."
