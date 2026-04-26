@@ -1,4 +1,0 @@
-interface:
-  display_name: "Visual Media Downloader"
-  short_description: "Download reusable image, GIF, stock footage, and video assets into a project"
-  default_prompt: "Use visual_media_downloader to download user-approved visual media URLs into local project assets and update manifests."

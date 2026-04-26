@@ -406,12 +406,29 @@ def provider_failure(provider: str, media_type: str, exc: Exception) -> dict[str
     }
 
 
-def save_candidate(project_dir: pathlib.Path, candidate: dict[str, Any], query: str, index: int) -> dict[str, Any]:
+def subdir_for(media_type: str, material_library_root: str | None) -> str:
+    if material_library_root:
+        root = material_library_root.strip("/").strip()
+        if media_type == "audio":
+            return f"{root}/audio/ambience"
+        if media_type == "video":
+            return f"{root}/videos"
+        return f"{root}/images"
+    return "audio/curated" if media_type == "audio" else "assets/curated/videos" if media_type == "video" else "assets/curated/images"
+
+
+def save_candidate(
+    project_dir: pathlib.Path,
+    candidate: dict[str, Any],
+    query: str,
+    index: int,
+    material_library_root: str | None = None,
+) -> dict[str, Any]:
     media_type = candidate["media_type"]
     provider = candidate["provider"]
     base = slugify(candidate.get("title") or query, f"asset-{index:03d}")
     asset_id = stable_id(provider, f"{candidate['download_url']}|{query}")
-    subdir = "audio/curated" if media_type == "audio" else "assets/curated/videos" if media_type == "video" else "assets/curated/images"
+    subdir = subdir_for(media_type, material_library_root)
     temp_path = project_dir / subdir / f".{asset_id}.download"
     size_bytes, content_type = download_file(candidate["download_url"], temp_path)
     suffix = suffix_for(candidate["download_url"], content_type, ".mp3" if media_type == "audio" else ".mp4" if media_type == "video" else ".jpg")
@@ -450,6 +467,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--per-provider", type=int, default=6, help="Candidates to fetch per provider.")
     parser.add_argument("--dry-run", action="store_true", help="Only write candidate/search manifest; do not download.")
     parser.add_argument("--update-asset-manifest", action="store_true")
+    parser.add_argument(
+        "--material-library-root",
+        default="materials",
+        help="Unified project-relative material library root. Pass an empty value only for the legacy output layout.",
+    )
     return parser.parse_args()
 
 
@@ -498,7 +520,13 @@ def main() -> int:
                 if args.dry_run:
                     continue
                 try:
-                    asset = save_candidate(project_dir, candidate, media_query, len(downloaded_assets) + 1)
+                    asset = save_candidate(
+                        project_dir,
+                        candidate,
+                        media_query,
+                        len(downloaded_assets) + 1,
+                        args.material_library_root,
+                    )
                     downloaded_assets.append(asset)
                     report["downloaded_asset_ids"].append(asset["asset_id"])
                     print(f"downloaded {asset['asset_id']}: {asset['path']}")

@@ -1,0 +1,4 @@
+interface:
+  display_name: "素材获取"
+  short_description: "统一获取图片、视频、BGM、音效和参考素材，并写入项目 manifest"
+  default_prompt: "使用素材获取：先引导我确认项目、场景、统一风格、画幅尺寸、素材来源和每类数量；确认后通过官方 API、用户 URL 或浏览器辅助下载素材，导入本地项目并更新 manifest。"

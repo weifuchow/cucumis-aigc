@@ -1,0 +1,4 @@
+interface:
+  display_name: "Stock Editorial Composer"
+  short_description: "统一入口下按成本档位用下载素材和可选生成编排成片"
+  default_prompt: "使用 stock-editorial-composer：统一入口确认音频主导流程和成本档位 0/1/2；旁白与分镜确定后再第一轮搜索素材；串成 rough cut 后做第二轮缺口检查，多轮补素材或少量生成，混 BGM 和环境声，最后本地导出 MP4。"

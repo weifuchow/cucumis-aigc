@@ -14,7 +14,7 @@ description: Use the in-app browser to help a user search Pixabay Music by video
 - 用户希望找适合场景描述的 BGM
 - Pixabay Music 没有稳定公开 API，需要浏览器人机协作
 - 用户已登录 Pixabay 或愿意在浏览器中处理登录/下载确认
-- `stock_asset_curator` 已完成图片、视频、音效 API 下载，但需要补充 BGM
+- `asset_acquisition` 已完成图片、视频、音效 API 下载，但需要补充 BGM
 
 ## Workflow
 

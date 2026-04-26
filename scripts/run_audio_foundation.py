@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import re
 import shutil
@@ -199,6 +200,10 @@ def _detect_file_suffix(url: str) -> str:
 
 def download_audio_to_local(url: str, target_path: pathlib.Path) -> None:
     target_path.parent.mkdir(parents=True, exist_ok=True)
+    if url.startswith("file://"):
+        source = pathlib.Path(urlparse(url).path)
+        shutil.copy2(source, target_path)
+        return
     request = urllib.request.Request(
         url,
         headers={
@@ -393,9 +398,10 @@ def main() -> int:
     project_dir = pathlib.Path(args.project).resolve()
     script = json.loads((project_dir / "script" / "script.json").read_text(encoding="utf-8"))
     task_input = json.loads((project_dir / "input" / "input.json").read_text(encoding="utf-8"))
-    # Prefer project-local Poe config; fall back to repo-root .env.
+    # Prefer project-local config; fall back to repo-root .env.
     project_env = project_dir / ".env"
-    config = load_poe_config(env_path=project_env if project_env.is_file() else None)
+    repo_env = pathlib.Path(__file__).resolve().parent.parent / ".env"
+    env_path = project_env if project_env.is_file() else (repo_env if repo_env.is_file() else None)
     audio_dir = project_dir / "audio"
     audio_dir.mkdir(parents=True, exist_ok=True)
 
@@ -463,24 +469,60 @@ def main() -> int:
         language=str(task_input["language"]),
     )
 
+    audio_provider = str(
+        task_input.get("audio_provider")
+        or os.environ.get("AUDIO_PROVIDER")
+        or os.environ.get("MEDIA_PROVIDER")
+        or "elevenlabs"
+    ).lower()
+    audio_model = str(task_input.get("audio_model") or "eleven_v3")
     generation_error: str | None = None
     try:
-        audio_result = generate_audio(
-            config=config,
-            model=str(task_input["audio_model"]),
-            prompt=narration_prompt,
-            duration_seconds=requested_duration,
-            language=str(task_input["language"]),
-        )
+        if audio_provider == "elevenlabs":
+            from elevenlabs.client import load_elevenlabs_config
+            from elevenlabs.media import generate_tts
+
+            el_config = load_elevenlabs_config(env_path=env_path)
+            audio_result = generate_tts(
+                el_config,
+                prompt=narration_prompt,
+                duration_seconds=requested_duration,
+                language=str(task_input["language"]),
+                model_id=audio_model,
+            )
+        elif audio_provider == "poe":
+            config = load_poe_config(env_path=env_path)
+            audio_result = generate_audio(
+                config=config,
+                model=audio_model,
+                prompt=narration_prompt,
+                duration_seconds=requested_duration,
+                language=str(task_input["language"]),
+            )
+        else:
+            raise ValueError(f"unsupported audio_provider: {audio_provider}")
     except Exception as exc:  # pragma: no cover - network/provider edge
         generation_error = str(exc)
-        audio_result = generate_audio(
-            config=PoeConfig(api_key="", base_url=config.base_url),
-            model=str(task_input["audio_model"]),
-            prompt=narration_prompt,
-            duration_seconds=requested_duration,
-            language=str(task_input["language"]),
-        )
+        if audio_provider == "poe":
+            config = load_poe_config(env_path=env_path)
+            audio_result = generate_audio(
+                config=PoeConfig(api_key="", base_url=config.base_url),
+                model=audio_model,
+                prompt=narration_prompt,
+                duration_seconds=requested_duration,
+                language=str(task_input["language"]),
+            )
+        else:
+            from elevenlabs.client import ElevenLabsConfig
+            from elevenlabs.media import generate_tts
+
+            audio_result = generate_tts(
+                ElevenLabsConfig(api_key=""),
+                prompt=narration_prompt,
+                duration_seconds=requested_duration,
+                language=str(task_input["language"]),
+                model_id=audio_model,
+            )
 
     local_audio_relpath: str | None = None
     local_audio_duration: float | None = None
@@ -545,6 +587,7 @@ def main() -> int:
     }
     voiceover = {
         "segments": segments,
+        "provider": audio_provider,
         "target_duration_seconds": requested_duration,
         "actual_duration_seconds": round(effective_duration, 2),
         "source_url": audio_url,
@@ -559,7 +602,7 @@ def main() -> int:
         "fit_speed_ratio": fit_speed_ratio,
     }
     tts_response = {
-        "provider": "poe",
+        "provider": audio_provider,
         "mode": audio_result["mode"],
         "model": audio_result["model"],
         "request_id": audio_result["request_id"],
@@ -578,7 +621,7 @@ def main() -> int:
         "response": audio_result["raw_response"],
     }
     usage = {
-        "provider": "poe",
+        "provider": audio_provider,
         "mode": audio_result["mode"],
         "model": audio_result["model"],
         "request_id": audio_result["request_id"],
@@ -594,7 +637,7 @@ def main() -> int:
     write_usage_json(
         audio_dir / "voiceover-request.json",
         {
-            "provider": "poe",
+            "provider": audio_provider,
             "model": audio_result["model"],
             "request_id": audio_result["request_id"],
             "prompt_path": "audio/voiceover.prompt.txt",
@@ -616,6 +659,7 @@ def main() -> int:
         project_dir,
         {
             "skill": "audio_foundation",
+            "provider": audio_provider,
             "model": audio_result["model"],
             "request_id": audio_result["request_id"],
             "cost_points": audio_result["usage"]["cost_points"],

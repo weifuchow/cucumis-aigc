@@ -1,4 +1,0 @@
-interface:
-  display_name: "素材获取器"
-  short_description: "多轮确认场景、风格、尺寸和音乐方向后，下载图片/视频/音频素材到当前项目"
-  default_prompt: "使用素材获取器：先引导我确认视频场景、统一风格、画幅尺寸、图片/视频/音频/BGM备选数量，确认后用 API 下载图片/视频/音效，并用 Pixabay Music 浏览器辅助下载 BGM，最后导入本地项目并更新 manifest。"

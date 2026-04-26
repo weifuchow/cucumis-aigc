@@ -1,4 +1,0 @@
-interface:
-  display_name: "Audio Music Downloader"
-  short_description: "Download reusable music, BGM, sound effects, and audio assets into a project"
-  default_prompt: "Use audio_music_downloader to download user-approved audio URLs or import browser-downloaded audio files into local project assets and update manifests."
