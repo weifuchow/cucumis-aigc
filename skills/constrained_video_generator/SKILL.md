@@ -62,6 +62,12 @@ storyboard 中 `local_render_technique` 字段控制 FFmpeg 渲染方式：
 | `crossfade` | 两图缓慢淡入淡出 |
 | `zoom_in/zoom_out/pan_left/pan_right` | Ken Burns 效果 |
 
+Ken Burns 图片动画会额外考虑 `projects/<project>/analysis/image-motion-plan.json`：
+
+- 如果存在同 `scene_id` / `segment_id` 的 motion plan，优先使用其中的 `start_zoom`、`end_zoom`、`start_center`、`end_center`、`easing`
+- 如果不存在 motion plan，再退回 `local_render_technique` 和 `motion_intent` 的默认参数
+- 这一步用于把“图片主体/构图/叙事功能”的理解写入实际图片动画，而不是所有图片共用中心缩放
+
 如果 storyboard 未设置 `local_render_technique`，脚本会根据 `motion_intent` 自动选择：
 - `fast_push/whip_pan/handheld` → `alternating`
 - `slow_pan` → `zoom_in`

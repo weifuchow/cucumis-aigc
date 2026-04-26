@@ -98,6 +98,126 @@ def should_use_static_clip(scene: dict[str, Any]) -> bool:
     return motion_intent in static_motion
 
 
+def load_image_motion_plan(project_dir: pathlib.Path, path: pathlib.Path | None = None) -> dict[str, dict[str, Any]]:
+    """Load optional analyzed still-image motion parameters by segment/scene id."""
+    plan_path = path or project_dir / "analysis" / "image-motion-plan.json"
+    if not plan_path.is_file():
+        return {}
+    try:
+        plan = read_json(plan_path, "image motion plan")
+    except (ValueError, json.JSONDecodeError):
+        return {}
+    segments = plan.get("segments", [])
+    if not isinstance(segments, list):
+        return {}
+    return {
+        str(segment["segment_id"]): segment
+        for segment in segments
+        if isinstance(segment, dict) and isinstance(segment.get("segment_id"), str)
+    }
+
+
+def _default_image_motion_for_intent(intent: str, direction: str) -> dict[str, Any]:
+    """Fallback semantic motion when no image-understanding plan exists."""
+    intent = intent.lower()
+    direction = direction.lower()
+    if "zoom_out" in intent or direction == "zoom_out":
+        return {
+            "type": "fallback_zoom_out",
+            "easing": "ease_out_sine",
+            "start_zoom": 1.14,
+            "end_zoom": 1.04,
+            "start_center": {"x": 0.5, "y": 0.5},
+            "end_center": {"x": 0.5, "y": 0.52},
+        }
+    if "pan" in intent or direction in {"pan_left", "pan_right"}:
+        start_x, end_x = (0.56, 0.44) if direction == "pan_left" else (0.44, 0.56)
+        return {
+            "type": "fallback_pan",
+            "easing": "ease_in_out_sine",
+            "start_zoom": 1.10,
+            "end_zoom": 1.12,
+            "start_center": {"x": start_x, "y": 0.5},
+            "end_center": {"x": end_x, "y": 0.5},
+        }
+    if "quick" in intent or "fast" in intent:
+        return {
+            "type": "fallback_quick_push",
+            "easing": "ease_in_cubic",
+            "start_zoom": 1.04,
+            "end_zoom": 1.18,
+            "start_center": {"x": 0.5, "y": 0.52},
+            "end_center": {"x": 0.56, "y": 0.47},
+        }
+    return {
+        "type": "fallback_push",
+        "easing": "ease_in_out_sine",
+        "start_zoom": 1.03,
+        "end_zoom": 1.10,
+        "start_center": {"x": 0.5, "y": 0.52},
+        "end_center": {"x": 0.5, "y": 0.48},
+    }
+
+
+def _image_motion_easing_expr(name: str, progress_expr: str) -> str:
+    if name == "ease_in_out_quad":
+        return f"if(lte({progress_expr},0.5),2*{progress_expr}*{progress_expr},1-pow(-2*{progress_expr}+2,2)/2)"
+    if name == "ease_out_cubic":
+        return f"1-pow(1-{progress_expr},3)"
+    if name == "ease_in_cubic":
+        return f"{progress_expr}*{progress_expr}*{progress_expr}"
+    if name == "ease_out_sine":
+        return f"sin(({progress_expr})*PI/2)"
+    return f"0.5-0.5*cos(PI*{progress_expr})"
+
+
+def resolve_image_motion(
+    *,
+    scene_id: str,
+    motion_intent: str = "",
+    direction: str = "zoom_in",
+    image_motion_plan: dict[str, dict[str, Any]] | None = None,
+) -> tuple[dict[str, Any], str]:
+    """Choose image animation params, considering analyzed image intent first."""
+    plan_segment = (image_motion_plan or {}).get(scene_id)
+    if isinstance(plan_segment, dict) and isinstance(plan_segment.get("motion"), dict):
+        return plan_segment["motion"], "analysis/image-motion-plan.json"
+    return _default_image_motion_for_intent(motion_intent, direction), "fallback_from_motion_intent"
+
+
+def build_zoompan_filter_from_motion(
+    *,
+    motion: dict[str, Any],
+    total_frames: int,
+    width: int = 720,
+    height: int = 1280,
+    fps: int = 30,
+) -> str:
+    """Build exact-frame Ken Burns zoompan from semantic motion parameters."""
+    denom = max(1, total_frames - 1)
+    progress = f"on/{denom}"
+    eased = _image_motion_easing_expr(str(motion.get("easing", "ease_in_out_sine")), progress)
+    start_zoom = float(motion.get("start_zoom", 1.03))
+    end_zoom = float(motion.get("end_zoom", 1.10))
+    start_center = motion.get("start_center", {"x": 0.5, "y": 0.5})
+    end_center = motion.get("end_center", {"x": 0.5, "y": 0.5})
+    sx = float(start_center.get("x", 0.5))
+    sy = float(start_center.get("y", 0.5))
+    ex = float(end_center.get("x", sx))
+    ey = float(end_center.get("y", sy))
+    cx = f"({sx}+({ex}-{sx})*({eased}))"
+    cy = f"({sy}+({ey}-{sy})*({eased}))"
+    x_expr = f"max(0,min(iw-iw/zoom,{cx}*iw-iw/zoom/2))"
+    y_expr = f"max(0,min(ih-ih/zoom,{cy}*ih-ih/zoom/2))"
+    z_expr = f"{start_zoom}+({end_zoom}-{start_zoom})*({eased})"
+    return (
+        "scale=1440:2560:force_original_aspect_ratio=increase,"
+        "crop=1440:2560,"
+        f"zoompan=z='{z_expr}':x='{x_expr}':y='{y_expr}':d={total_frames}:s={width}x{height}:fps={fps},"
+        "format=yuv420p"
+    )
+
+
 def render_static_clip(
     *,
     ffmpeg_binary: str,
@@ -318,29 +438,39 @@ def render_zoom_pan_clip(
     image_path: str,
     duration_seconds: float,
     direction: str = "zoom_in",
+    motion_intent: str = "",
+    image_motion_plan: dict[str, dict[str, Any]] | None = None,
+    output_path: pathlib.Path | None = None,
 ) -> tuple[bool, str]:
-    """Ken Burns zoom/pan effect on a single image."""
+    """Ken Burns zoom/pan effect on a single image.
+
+    If analysis/image-motion-plan.json contains this scene/segment id, use its
+    image-understanding motion params before falling back to the coarse
+    direction/motion_intent preset.
+    """
     source_path = pathlib.Path(image_path) if pathlib.Path(image_path).is_absolute() else project_dir / image_path
     if not source_path.is_file():
         return False, f"image not found: {image_path}"
 
     safe_duration = max(round(duration_seconds, 2), 0.8)
-    total_frames = int(safe_duration * 30)
-    output_path = project_dir / "video" / "static" / f"{scene_id}.mp4"
+    total_frames = max(1, int(round(safe_duration * 30)))
+    output_path = output_path or project_dir / "video" / "static" / f"{scene_id}.mp4"
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    zoompan_exprs: dict[str, str] = {
-        "zoom_in":   f"zoompan=z='min(zoom+0.0015,1.5)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={total_frames}:s=720x1280:fps=30",
-        "zoom_out":  f"zoompan=z='if(lte(zoom,1.0),1.5,max(zoom-0.0015,1.0))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={total_frames}:s=720x1280:fps=30",
-        "pan_left":  f"zoompan=z=1.2:x='min(x+1,iw*(1-1/zoom))':y='ih/2-(ih/zoom/2)':d={total_frames}:s=720x1280:fps=30",
-        "pan_right": f"zoompan=z=1.2:x='max(x-1,0)':y='ih/2-(ih/zoom/2)':d={total_frames}:s=720x1280:fps=30",
-    }
-    zp = zoompan_exprs.get(direction, zoompan_exprs["zoom_in"])
+    motion, _motion_source = resolve_image_motion(
+        scene_id=scene_id,
+        motion_intent=motion_intent,
+        direction=direction,
+        image_motion_plan=image_motion_plan,
+    )
+    vf = build_zoompan_filter_from_motion(motion=motion, total_frames=total_frames)
     command = [
         ffmpeg_binary, "-y",
-        "-loop", "1", "-i", str(source_path),
-        "-vf", f"scale=1440:2560,{zp},format=yuv420p",
-        "-t", str(safe_duration), "-r", "30",
+        "-i", str(source_path),
+        "-vf", vf,
+        "-frames:v", str(total_frames),
+        "-r", "30",
+        "-an",
         "-c:v", "libx264", "-pix_fmt", "yuv420p",
         str(output_path),
     ]
@@ -358,6 +488,9 @@ def _render_by_technique(
     scene_id: str,
     image_paths: list[str],
     duration_seconds: float,
+    motion_intent: str = "",
+    image_motion_plan: dict[str, dict[str, Any]] | None = None,
+    output_path: pathlib.Path | None = None,
 ) -> tuple[bool, str, str]:
     """Dispatch to the right local renderer. Returns (ok, path_or_error, source_mode)."""
     if technique == "alternating" and len(image_paths) >= 2:
@@ -378,8 +511,17 @@ def _render_by_technique(
             ffmpeg_binary=ffmpeg_binary, project_dir=project_dir,
             scene_id=scene_id, image_path=image_paths[0], duration_seconds=duration_seconds,
             direction=direction,
+            motion_intent=motion_intent,
+            image_motion_plan=image_motion_plan,
+            output_path=output_path,
         )
-        return ok, result, f"{direction}_ffmpeg"
+        motion, motion_source = resolve_image_motion(
+            scene_id=scene_id,
+            motion_intent=motion_intent,
+            direction=direction,
+            image_motion_plan=image_motion_plan,
+        )
+        return ok, result, f"{direction}_ffmpeg:{motion_source}:{motion.get('type', 'motion')}"
     if len(image_paths) == 1:
         ok, result = render_static_clip(
             ffmpeg_binary=ffmpeg_binary, project_dir=project_dir,
@@ -623,6 +765,7 @@ def main() -> int:
 
     ffmpeg_available = shutil.which(args.ffmpeg_binary) is not None
     scene_images = load_scene_images(project_dir)
+    image_motion_plan = load_image_motion_plan(project_dir)
     prompt_map = load_prompt_map(project_dir)
     static_clip_errors: list[str] = []
     local_static_clips: dict[str, dict[str, Any]] = {}
@@ -678,6 +821,8 @@ def main() -> int:
                 scene_id=scene_id,
                 image_paths=image_paths,
                 duration_seconds=duration,
+                motion_intent=str(scene.get("motion_intent", "")),
+                image_motion_plan=image_motion_plan,
             )
             if ok:
                 local_static_clips[scene_id] = {
@@ -735,6 +880,8 @@ def main() -> int:
                 scene_id=scene_id,
                 image_paths=image_paths_list,
                 duration_seconds=duration,
+                motion_intent=motion_intent,
+                image_motion_plan=image_motion_plan,
             )
             if ok:
                 local_static_clips[scene_id] = {
